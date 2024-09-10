@@ -17,6 +17,6 @@ apt install bacula
   Catalog {
   Name = MyCatalog
   dbname = "bacula"; DB Address = "localhost"; dbuser = "bacula"; dbpassword = "Password"
-}```
-
+}
+```
 
