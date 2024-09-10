@@ -6,8 +6,11 @@ _Bacula_, в отличие от _Bareos_ присутствует в станд
 apt install bacula
 ```
 
-> [!NOTE] При установке метапакета _Bacula_ устанавливаются следующий перечень пакетов: *bacula-bscan bacula-client bacula-common bacula-common-pgsql bacula-console bacula-director bacula-director-pgsql bacula-fd bacula-sd bacula-server bsd-mailx dbconfig-common dbconfig-pgsql exim4-base exim4-config exim4-daemon-light libcommon-sense-perl
-> libgnutls-dane0 libjson-perl libjson-xs-perl libllvm14 liblockfile1 libpq5 libtypes-serialiser-perl libunbound8 mt-st mtx postgresql postgresql-15 postgresql-client postgresql-client-15 postgresql-client-common postgresql-common sysstat*, один из которых - _bacula-director-pgsq_ потребует интерактивной настройки:
+> [!NOTE]
+> При установке метапакета _Bacula_ устанавливаются следующий перечень пакетов: *bacula-bscan bacula-client bacula-common bacula-common-pgsql bacula-console bacula-director bacula-director-pgsql bacula-fd bacula-sd bacula-server bsd-mailx dbconfig-common dbconfig-pgsql exim4-base exim4-config exim4-daemon-light libcommon-sense-perl
+> libgnutls-dane0 libjson-perl libjson-xs-perl libllvm14 liblockfile1 libpq5 libtypes-serialiser-perl libunbound8 mt-st mtx postgresql postgresql-15 postgresql-client postgresql-client-15 postgresql-client-common postgresql-common sysstat*, один из которых - _bacula-director-pgsq_ потребует интерактивной настройки.
+
+![20240910-01.png]
 
 Чтобы избежать такого поведения, необходимо перед запуском `apt install` задать переменную **_DEBIAN_FRONTEND=noninteractive_** таким образом: `export DEBIAN_FRONTEND=noninteractive`. Тогда установщик при настройке _Bacula Catalog_ назначит параметры по умолчанию:
 ```# Generic catalog service
@@ -16,5 +19,4 @@ apt install bacula
   dbname = "bacula"; DB Address = "localhost"; dbuser = "bacula"; dbpassword = "Password"
 }```
 
-![20240910-01.png]
 
