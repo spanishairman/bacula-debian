@@ -28,6 +28,7 @@ File Daemon   -> Storage Daemon:9103
   - **_Incremental_** - инкрементное резервное копирование включает все файлы, измененные с момента запуска последнего полного, разностного или инкрементного резервного копирования. Обычно он указывается в директиве Level в определении ресурса Job или в ресурсе Schedule;
   - **_Resource_** - ресурс является частью файла конфигурации, который определяет конкретную единицу информации, доступную для Bacula. Он состоит из нескольких директив (отдельных операторов конфигурации). Например, ресурс задания определяет все свойства конкретного задания: имя, расписание, пул томов, тип резервного копирования, уровень резервного копирования, и т.д.;
   - **_Job_** - задание в _Bacula_ - это ресурс конфигурации, который определяет работу, которую Bacula должна выполнить для резервного копирования или восстановления конкретного клиента. Он состоит из типа (резервное копирование, восстановление, проверка и т.д.), Уровня (полный, дифференциальный, инкрементный и т.д.), Набора файлов и хранилища, для которого необходимо создать резервные копии файлов (устройство хранения, пул носителей);
+  - **_JobDefs_** - необязательный ресурс для предоставления значений по умолчанию для ресурсов Job. Т.о. - JobDefs представляет собой шаблон со значениями, которые часто используются в ресурсах Job, позволяющий сократить ваши настройки и облегчить чтение конфигурации;
   - **_Restore_** -  ресурс конфигурации, который описывает операцию восстановления файла с носителя резервной копии. Это обратное сохранение, за исключением того, что в большинстве случаев для восстановления обычно требуется небольшой набор файлов для восстановления, в то время как обычно для сохранения создаются резервные копии всех файлов в системе. Конечно, после сбоя диска Bareos можно вызвать для полного восстановления всех файлов, которые были в системе;
   - **_Retention Period_** - Существуют различные виды периодов хранения, которые распознает Bacula. Наиболее важными являются:
      - период хранения файлов,
@@ -116,3 +117,141 @@ root@debian12:/etc/bacula# usermod -a -G bacula vagrant
 ###### Блок настроек Director
 > [!NOTE]
 > Director - Главный демон сервера Bacula, который планирует и направляет все операции Bacula. Сокращённое обозначение в тексте документации - DIR.
+
+```
+#
+# Default Bacula Director Configuration file
+#
+#  The only thing that MUST be changed is to add one or more
+#   file or directory names in the Include directive of the
+#   FileSet resource.
+#
+#  For Bacula release 9.6.7 (10 December 2020) -- debian bookworm/sid
+#
+#  You might also want to change the default email address
+#   from root to your address.  See the "mail" and "operator"
+#   directives in the Messages resource.
+#
+# Copyright (C) 2000-2020 Kern Sibbald
+# License: BSD 2-Clause; see file LICENSE-FOSS
+#
+
+Director {                            # define myself
+  Name = debian12-dir
+  DIRport = 9101                # where we listen for UA connections
+  QueryFile = "/etc/bacula/scripts/query.sql"
+  WorkingDirectory = "/var/lib/bacula"
+  PidDirectory = "/run/bacula"
+  Maximum Concurrent Jobs = 20
+  Password = "QU3EOkh3mnNp1oe4DLbXCJ4uRLaWZMxVD"         # Console password
+  Messages = Daemon
+  DirAddress = 0.0.0.0  
+}
+```
+Здесь мы изменили сетевой адрес, на котором доступен демон Director, остальные настройки остались от установщика.
+
+###### Блок настроек Jobdefs
+_Шаблоны задач_. Некоторые параметры для различных задач Job могут повторяться. Поэтому такие параметры можно вынести в блоки Jobdefs чтобы затем ссылаться на них из блоков Job и сократить таким образом количество вносимых параметров. 
+```
+JobDefs {
+  Name = "My-Full-Tpl"
+  Type = Backup
+  Level = Full
+  Storage = FileSD
+  Messages = Standard
+  SpoolAttributes = yes
+  Priority = 10
+  Write Bootstrap = "/var/lib/bacula/%c.bsr"
+}
+ 
+JobDefs {
+  Name = "My-Diff-Tpl"
+  Type = Backup
+  Level = Differential
+  Storage = FileSD
+  Messages = Standard
+  SpoolAttributes = yes
+  Priority = 10
+  Write Bootstrap = "/var/lib/bacula/%c.bsr"
+}
+ 
+JobDefs {
+  Name = "My-Incr-Tpl"
+  Type = Backup
+  Level = Incremental
+  Storage = FileSD
+  Messages = Standard
+  SpoolAttributes = yes
+  Priority = 10
+  Write Bootstrap = "/var/lib/bacula/%c.bsr"
+}
+```
+###### Блок настроек Job
+
+> [!NOTE]
+> Job - Задание в Bacula - это ресурс конфигурации, который определяет работу, которую Bacula должна выполнить для резервного копирования или восстановления конкретного клиента. Он состоит из типа (резервное копирование, восстановление, проверка и т.д.), Уровня (полный, дифференциальный, инкрементный и т.д.), Набора файлов и хранилища, для которого необходимо создать резервные копии файлов (устройство хранения, пул носителей). 
+
+Создадим две задачи - _Clnt1-fs-Job_ и _Clnt2-fs-Job_, в которых будут архивироваться каталоги, перечисленные в параметре _FileSet = "My-fs-FS"_. Это общий параметр для обеих задач и далле в конфигурационном файле мы зададим для него список какталогов, подлежащих резервному копированию.
+
+Также здесь перечислены пулы для каждого из трёх типов резервных копий - полная, разностная и инкрементная. Пулы в каждой задаче свои и будут содержать тома только одного клиента, это необязательное условие, просто здесь я выбрал такой принцип для наглядности.
+
+Расписание - также для каждого клиента своё.
+
+Скрипты, выполняющиеся до и после задачи резервного копирования - запускаются на клиентской машине, т.е. на стороне File Daemon. 
+Такие скрипты могут содержать команды по предварительному сжатию архивируемых файлов, копированию их в tar-архив или, например, sql-команды, выполняющие дамп баз данных. 
+Скрипты, выполняющиеся после задачи резервного копирования, могут содержать команды по удалению архивируемых файлов или ранее созданных tar-архивов или sql-файлов.
+> [!NOTE]
+> Чтобы было легче ориентироваться, я для задач, пулов, расписаний и клиентов выбрал шаблонные имена, которые содержат общие части. 
+> Например, для клиента _Debian12cl1-fd_ соответствует имя задачи _Clnt1-fs-Job_, пул _Clnt1-fs-Full_, расписание - _Clnt1-fs-Sdl_.
+
+```
+Job {
+  Name = "Clnt1-fs-Job"
+  Type = Backup
+  FileSet = "My-fs-FS"
+  Pool = Clnt1-fs-Full
+  Full Backup Pool = Clnt1-fs-Full                  # write Full Backups into "Full" Pool         (#05)
+  Differential Backup Pool = Clnt1-fs-Diff
+  Incremental Backup Pool = Clnt1-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
+  Schedule = "Clnt1-fs-Sdl"
+  JobDefs = "My-Full-Tpl"
+  Client = "Debian12cl1-fd"
+  ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
+  ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
+}
+
+Job {
+  Name = "Clnt2-fs-Job"
+  Type = Backup
+  FileSet = "My-fs-FS"
+  Pool = Clnt2-fs-Full
+  Full Backup Pool = Clnt2-fs-Full                  # write Full Backups into "Full" Pool         (#05)
+  Differential Backup Pool = Clnt2-fs-Diff
+  Incremental Backup Pool = Clnt2-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
+  Schedule = "Clnt2-ds-Sdl"
+  JobDefs = "My-Full-Tpl"
+  Client = "Debian12cl2-fd"
+#  ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
+#  ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
+}
+```
+
+В примере ниже описывается стандартная задача восстановления на несуществующий носитель, как говорится в описании, этого достаточно для всех наборов Jobs, Clients, Storages. Я лишь изменил каталог по умолчанию, в который будут восстанавливаться данные. 
+```
+#
+# Standard Restore template, to be changed by Console program
+#  Only one such job is needed for all Jobs/Clients/Storage ...
+#
+Job {
+  Name = "RestoreFiles"
+  Type = Restore
+  Client=debian12-fd
+  Storage = File1
+# The FileSet and Pool directives are not used by Restore Jobs
+# but must not be removed
+  FileSet="Full Set"
+  Pool = File
+  Messages = Standard
+  Where = /nonexistant/path/to/file/archive/dir/bacula-restores
+}
+```
