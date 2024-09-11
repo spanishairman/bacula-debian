@@ -35,3 +35,46 @@ apt install bacula
 ```
 где __Password__ - произвольный пароль, созданный инсталлятором.
 
+База данных для Bacula создается автоматически установщиком:
+```
+root@debian12:/etc/bacula# su postgres 
+postgres@debian12:/etc/bacula$ psql -d bacula
+psql (15.8 (Debian 15.8-0+deb12u1))
+Введите "help", чтобы получить справку.
+
+bacula=# \dt
+               Список отношений
+ Схема  |      Имя       |   Тип   | Владелец 
+--------+----------------+---------+----------
+ public | basefiles      | таблица | bacula
+ public | cdimages       | таблица | bacula
+ public | client         | таблица | bacula
+ public | counters       | таблица | bacula
+ public | device         | таблица | bacula
+ public | file           | таблица | bacula
+ public | filename       | таблица | bacula
+ public | fileset        | таблица | bacula
+ public | job            | таблица | bacula
+ public | jobhisto       | таблица | bacula
+ public | jobmedia       | таблица | bacula
+ public | location       | таблица | bacula
+ public | locationlog    | таблица | bacula
+ public | log            | таблица | bacula
+ public | media          | таблица | bacula
+ public | mediatype      | таблица | bacula
+ public | path           | таблица | bacula
+ public | pathhierarchy  | таблица | bacula
+ public | pathvisibility | таблица | bacula
+ public | pool           | таблица | bacula
+ public | restoreobject  | таблица | bacula
+ public | snapshot       | таблица | bacula
+ public | status         | таблица | bacula
+ public | storage        | таблица | bacula
+ public | unsavedfiles   | таблица | bacula
+ public | version        | таблица | bacula
+(26 строк)
+```
+Для того, чтобы пользователь (vagrant в данном случае) мог пользоваться графическим приложением Bacula Admin Tool - bat, добавим его в группу bacula. 
+```
+root@debian12:/etc/bacula# usermod -a -G bacula vagrant
+```
