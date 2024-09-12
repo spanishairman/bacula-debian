@@ -467,7 +467,7 @@ Client {
   Catalog = MyCatalog
   Password = "DYrPl1SQnGYgUHDy809bU6ejZyo-N97m4"          # password for FileDaemon
   File Retention = 365 days            # 60 days
-  Job Retention = 36 months            # six months
+  Job Retention = 12 months            # six months
   AutoPrune = yes                     # Prune expired Jobs/Files
 }
  
@@ -479,7 +479,7 @@ Client {
   Catalog = MyCatalog
   Password = "tyWfHO1Bp3joollMSdXggFoeBoMTPZF8G"          # password for FileDaemon
   File Retention = 365 days           # 60 days
-  Job Retention = 36 months           # six months
+  Job Retention = 12 months           # six months
   AutoPrune = yes                     # Prune expired Jobs/Files
 }
 ```
@@ -491,3 +491,59 @@ Client {
 >[!NOTE]
 > _Bacula_ никогда не будет удалять записи из _Catalog_, даже если срок их хранения закончился, пока в соответствующих пулах есть свободные тома или на томах есть свободное место и не превышено количество заданий на них.
 
+###### Сщщбщения (Messages)
+Значения по умолчанию:
+```
+# Reasonable message delivery -- send most everything to email address
+#  and to the console
+Messages {
+  Name = Standard
+#
+# NOTE! If you send to two email or more email addresses, you will need
+#  to replace the %r in the from field (-f part) with a single valid
+#  email address in both the mailcommand and the operatorcommand.
+#  What this does is, it sets the email address that emails would display
+#  in the FROM field, which is by default the same email as they're being
+#  sent to.  However, if you send email to more than one address, then
+#  you'll have to set the FROM address manually, to a single address.
+#  for example, a 'no-reply@mydomain.com', is better since that tends to
+#  tell (most) people that its coming from an automated source.
+
+#
+  mailcommand = "/usr/sbin/bsmtp -h localhost -f \"\(Bacula\) \<%r\>\" -s \"Bacula: %t %e of %c %l\" %r"
+  operatorcommand = "/usr/sbin/bsmtp -h localhost -f \"\(Bacula\) \<%r\>\" -s \"Bacula: Intervention needed for %j\" %r"
+  mail = root = all, !skipped
+  operator = root = mount
+  console = all, !skipped, !saved
+#
+# WARNING! the following will create a file that you must cycle from
+#          time to time as it will grow indefinitely. However, it will
+#          also keep all your messages if they scroll off the console.
+#
+  append = "/var/log/bacula/bacula.log" = all, !skipped
+  catalog = all
+}
+
+ 
+#
+# Message delivery for daemon messages (no job).
+Messages {
+  Name = Daemon
+  mailcommand = "/usr/sbin/bsmtp -h localhost -f \"\(Bacula\) \<%r\>\" -s \"Bacula daemon message\" %r"
+  mail = root = all, !skipped
+  console = all, !skipped, !saved
+  append = "/var/log/bacula/bacula.log" = all, !skipped
+}
+```
+Здесь можно задать свои параметры:
+  - **operator = spanish.airman@firma.com  = mount** - адрес получателя сообщений и события из команды **operatorcommand**;
+  - **mail = spanish.airman@firma.com all, !skipped** - адрес получателя сообщений и события из команды **mailcommand**.
+
+Operator Command - Этот ресурс похож на Mail Command, за исключением того, что он используется для сообщений Оператора. Замены, выполненные для Mail Command также выполняются для этой команды. Обычно для этой команды устанавливается то же значение, которое указано для Mail Command. Директива Operator Command должна появиться в ресурсе Messages перед директивой Operator.
+
+Mail - Отправить сообщение на адреса электронной почты, указанные в виде списка, разделенного запятыми (без пробела) в поле адреса. Сообщения электронной почты группируются во время выполнения задания, а затем отправляются как одно сообщение электронной почты после завершения задания. Преимущество этого назначения заключается в том, что мы получаем уведомление о каждом запущенном задании. Однако, если мы выполняем резервное копирование нескольких машин каждую ночь, количество сообщений электронной почты может раздражать. Некоторые пользователи используют программы-фильтры, такие как procmail, для автоматической регистрации этого сообщения электронной почты на основе кода завершения задания.
+
+Operator - Отправлять сообщение на адреса электронной почты, указанные в виде списка, разделенного запятыми (без пробела) в поле адреса. Это похоже на директиву Mail выше, за исключением того, что каждое сообщение отправляется по мере получения. Таким образом, на каждое сообщение приходится одно электронное письмо. Это наиболее полезно для сообщений о монтировании.
+
+>[!IMPORTANT]
+> Любая директива Mail Command должна быть указана в ресурсе Messages перед параметром Mail, Mail On Success или Mail On Error. 
