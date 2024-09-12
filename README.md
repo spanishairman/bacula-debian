@@ -358,6 +358,7 @@ Schedule {
 >  - **Full Backup Pool = Pool-name-Full**, 
 >  - **Differential Backup Pool = Pool-name-Diff**, 
 >  - **Incremental Backup Pool = Pool-name-Incr**,
+>
 > а также в ресурсе **Schedule** в виде 
 >  - **Level=Full Pool=Pool-name-Full**, 
 >  - **Level=Differential Pool=Pool-name-Diff**, 
