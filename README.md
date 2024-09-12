@@ -340,26 +340,59 @@ FileSet {
 Schedule {
   Enabled = yes
   Name = "Clnt-fs-Sdl"
-  Run = Level=Full 1st sun at 06:00
-  Run = Level=Differential 3rd sun at 06:00
-  Run = Level=Incremental at 21:00
+  Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00
+  Run = Level=Full at 01:00    
+  Run = Level=Differential at 13:00
+  Run = Level=Incremental hourly 2-12
+  Run = Level=Incremental hourly 14-23
+  Run = Level=Incremental on 2-31 at 00:00
 }
  
 Schedule {
   Enabled = yes
   Name = "Clnt2-fs-Sdl"
-  Run = Level=Full Pool=Clnt2-fs-Full 1st sun at 06:00
-  Run = Level=Differential Pool=Clnt2-fs-Diff 3rd sun at 06:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr at 21:00
-}
+  Run = Level=Full Pool=Clnt2-fs-Monthly on 1 at 00:00
+  Run = Level=Full Pool=Clnt2-fs-Full at 01:00
+  Run = Level=Differential Pool=Clnt2-fs-Diff at 13:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 02:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 03:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 04:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 05:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 06:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 07:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 08:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 09:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 10:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 11:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 12:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 14:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 15:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 16:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 17:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 18:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 19:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 20:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 21:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 22:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 23:00 
+  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly on 2-31 at 00:00
+} 
 ```
-Директива Run определяет, когда Задание должно быть выполнено, а также задаёт переопределения, если таковые имеются для применения. Вы можете указать несколько директив Run в ресурсе Schedule. Если вы это сделаете, все они будут применены (т.е. несколько расписаний). Если у вас есть две директивы Run, которые запускаются одновременно, два Задания запускаются одновременно (ну, в течение одной секунды друг от друга).
+В данном примере для расписания с именем _Clnt-fs-Sdl_ действуют следующие задания:
+  - **Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00** - выполняет полное резервное копировние в 00:00 каждого первого числа месяца, копия будет храниться на отдельном пуле томов в течение года;
+  - **Run = Level=Full at 01:00** - ежедневно в 01:00 выполняет полное резервное копирование на пул томов со сроком хранения 92 дня;
+  - **Run = Level=Differential at 13:00** - ежедневно в 13:00 выполняет разностное резервное копирование на пул томов со сроком хранения 31 день;
+  - **Run = Level=Incremental hourly 2-12** - инкрементная копия каждый час с 2 до 12 на том со сроком хранения - 7 дней;
+  - **Run = Level=Incremental hourly 14-23** - инкрементная копия каждый час с 14 до 23 на том со сроком хранения - 7 дней;
+  - **Run = Level=Incremental on 2-31 at 00:00** - инкрементная копия, выполняется в полночь кроме дня (1-е число каждого месяца), когда создается полная копия со сроком хранения 1 год.
 
-Переопределения заданий (Job-overrides) позволяют переопределять спецификации Уровня (Level), Хранилища (Storage), Сообщений (Messages) и Пула (Pool), представленные в ресурсе Задание (Job resource). Кроме того, спецификации FullPool, IncrementalPool и DifferentialPool позволяют переопределять спецификацию пула в зависимости от того, какой уровень заданий резервного копирования действует.
+Директива _Run_ определяет, когда _задание_ должно быть выполнено, а также задаёт переопределения, если таковые имеются для применения. Вы можете указать несколько директив _Run_ в ресурсе _Schedule_. Если вы это сделаете, все они будут применены (т.е. несколько расписаний). Если у вас есть две директивы _Run_, которые запускаются одновременно, два задания запускаются одновременно (ну, в течение одной секунды друг от друга).
 
-Используя переопределения, вы можете настроить конкретную Задачу. Например, вы можете указать переопределение сообщений для инкрементных резервных копий (Incremental backups), которые выводят сообщения в файл журнала, но для еженедельных или ежемесячных полных резервных копий вы можете отправлять выходные данные по электронной почте, используя другое переопределение сообщений.
+Переопределения заданий (Job-overrides) позволяют переопределять спецификации Уровня (Level), Хранилища (Storage), Сообщений (Messages) и Пула (Pool), представленные в ресурсе _задание_ (Job resource). Кроме того, спецификации _FullPool_, _IncrementalPool_ и _DifferentialPool_ позволяют переопределять спецификацию пула в зависимости от того, какой уровень заданий резервного копирования действует.
 
-Переопределения заданий задаются как: keyword=value, где ключевым словом является Level, Storage, Messages, Pool, FullPool, DifferentialPool, или IncrementalPool, а значение определено в соответствующих форматах директив для ресурса Job. Вы можете указать несколько переопределений заданий в одной директиве Run, разделяя их одним или несколькими пробелами или разделяя их запятой. Например:
+Используя переопределения, вы можете настроить конкретную _задачу_. Например, вы можете указать переопределение сообщений для _инкрементных резервных копий_ (Incremental backups), которые выводят сообщения в файл журнала, но для еженедельных или ежемесячных _полных резервных копий_ вы можете отправлять выходные данные по электронной почте, используя другое переопределение сообщений.
+
+Переопределения заданий задаются как: **keyword=value**, где ключевым словом является _Level_, _Storage_, _Messages_, _Pool_, _FullPool_, _DifferentialPool_, или _IncrementalPool_, а значение определено в соответствующих форматах директив для ресурса _Job_. Вы можете указать несколько переопределений заданий в одной директиве _Run_, разделяя их одним или несколькими пробелами или запятой. Например:
 
   - **Level=Full** - все файлы в FileSet независимо от того, были ли они изменены.
   - **Level=Incremental** - это все файлы, которые изменились с момента последнего резервного копирования.
