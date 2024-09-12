@@ -210,8 +210,8 @@ JobDefs {
 Job {
   Name = "Clnt1-fs-Job"
   Type = Backup
-  FileSet = "My-fs-FS"
-  Pool = Clnt1-fs-Full
+  FileSet = "My-tfs-FS"
+  Pool = Clnt-fs-Full
   Full Backup Pool = Clnt1-fs-Full                  # write Full Backups into "Full" Pool         (#05)
   Differential Backup Pool = Clnt1-fs-Diff
   Incremental Backup Pool = Clnt1-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
@@ -226,15 +226,9 @@ Job {
   Name = "Clnt2-fs-Job"
   Type = Backup
   FileSet = "My-fs-FS"
-  Pool = Clnt2-fs-Full
-  Full Backup Pool = Clnt2-fs-Full                  # write Full Backups into "Full" Pool         (#05)
-  Differential Backup Pool = Clnt2-fs-Diff
-  Incremental Backup Pool = Clnt2-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
-  Schedule = "Clnt2-ds-Sdl"
+  Schedule = "Clnt2-fs-Sdl"
   JobDefs = "My-Full-Tpl"
   Client = "Debian12cl2-fd"
-#  ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
-#  ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
 }
 ```
 
@@ -340,4 +334,26 @@ FileSet {
     }
     File = "F:/BackUP/"
   }
-'''
+```
+##### Расписания
+```
+Schedule {
+  Enabled = yes
+  Name = "Clnt-fs-Sdl"
+  Run = Level=Full 1st sun at 06:00
+  Run = Level=Differential 3rd sun at 06:00
+  Run = Level=Incremental at 21:00
+}
+ 
+Schedule {
+  Enabled = yes
+  Name = "Clnt2-fs-Sdl"
+  Run = Level=Full Pool=Clnt2-fs-Full 1st sun at 06:00
+  Run = Level=Differential Pool=Clnt2-fs-Diff 3rd sun at 06:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 21:00
+}
+```
+> [!NOTE]
+> Можно заметить, что пул томов, на которые производится резервное копирование, может быть задан как в ресурсе **Job** в виде **Full Backup Pool = Pool-name-Full**, **Differential Backup Pool = Pool-name-Diff** и **Incremental Backup Pool = Pool-name-Incr**,
+> а также в ресурсе **Schedule** в виде **Level=Full Pool=Pool-name-Full**, **Level=Differential Pool=Pool-name-Diff**, **Level=Incremental Pool=Pool-name-Incr**. Эти записи равнозначны и выбор зависит от того, хотите ли вы использовать одно общее расписание для 
+> разных задач, или каждой задаче ссответствует свое расписание.
