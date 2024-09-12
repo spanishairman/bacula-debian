@@ -363,4 +363,5 @@ Schedule {
 >  - **Level=Full Pool=Pool-name-Full**, 
 >  - **Level=Differential Pool=Pool-name-Diff**, 
 >  - **Level=Incremental Pool=Pool-name-Incr**. 
+> 
 > Эти записи равнозначны и выбор зависит от того, хотите ли вы использовать одно общее расписание для разных задач, или каждой задаче ссответствует свое расписание.
