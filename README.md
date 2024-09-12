@@ -343,8 +343,8 @@ Schedule {
   Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00
   Run = Level=Full at 01:00    
   Run = Level=Differential at 13:00
-  Run = Level=Incremental hourly 2-12
-  Run = Level=Incremental hourly 14-23
+  Run = Level=Incremental 2-12
+  Run = Level=Incremental 14-23
   Run = Level=Incremental on 2-31 at 00:00
 }
  
@@ -354,36 +354,36 @@ Schedule {
   Run = Level=Full Pool=Clnt2-fs-Monthly on 1 at 00:00
   Run = Level=Full Pool=Clnt2-fs-Full at 01:00
   Run = Level=Differential Pool=Clnt2-fs-Diff at 13:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 02:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 03:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 04:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 05:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 06:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 07:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 08:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 09:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 10:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 11:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 12:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 14:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 15:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 16:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 17:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 18:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 19:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 20:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 21:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 22:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly at 23:00 
-  Run = Level=Incremental Pool=Clnt2-fs-Incr hourly on 2-31 at 00:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 02:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 03:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 04:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 05:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 06:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 07:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 08:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 09:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 10:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 11:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 12:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 14:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 15:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 16:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 17:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 18:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 19:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 20:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 21:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 22:00
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 23:00 
+  Run = Level=Incremental Pool=Clnt2-fs-Incr on 2-31 at 00:00
 } 
 ```
 В данном примере для расписания с именем _Clnt-fs-Sdl_ действуют следующие задания:
   - **Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00** - выполняет полное резервное копировние в 00:00 каждого первого числа месяца, копия будет храниться на отдельном пуле томов в течение года;
   - **Run = Level=Full at 01:00** - ежедневно в 01:00 выполняет полное резервное копирование на пул томов со сроком хранения 92 дня;
   - **Run = Level=Differential at 13:00** - ежедневно в 13:00 выполняет разностное резервное копирование на пул томов со сроком хранения 31 день;
-  - **Run = Level=Incremental hourly 2-12** - инкрементная копия каждый час с 2 до 12 на том со сроком хранения - 7 дней;
-  - **Run = Level=Incremental hourly 14-23** - инкрементная копия каждый час с 14 до 23 на том со сроком хранения - 7 дней;
+  - **Run = Level=Incremental 2-12** - инкрементная копия каждый час с 2 до 12 на том со сроком хранения - 7 дней;
+  - **Run = Level=Incremental 14-23** - инкрементная копия каждый час с 14 до 23 на том со сроком хранения - 7 дней;
   - **Run = Level=Incremental on 2-31 at 00:00** - инкрементная копия, выполняется в полночь кроме дня (1-е число каждого месяца), когда создается полная копия со сроком хранения 1 год.
 
 Директива _Run_ определяет, когда _задание_ должно быть выполнено, а также задаёт переопределения, если таковые имеются для применения. Вы можете указать несколько директив _Run_ в ресурсе _Schedule_. Если вы это сделаете, все они будут применены (т.е. несколько расписаний). Если у вас есть две директивы _Run_, которые запускаются одновременно, два задания запускаются одновременно (ну, в течение одной секунды друг от друга).
