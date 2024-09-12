@@ -354,6 +354,12 @@ Schedule {
 }
 ```
 > [!NOTE]
-> Можно заметить, что пул томов, на которые производится резервное копирование, может быть задан как в ресурсе **Job** в виде **Full Backup Pool = Pool-name-Full**, **Differential Backup Pool = Pool-name-Diff** и **Incremental Backup Pool = Pool-name-Incr**,
-> а также в ресурсе **Schedule** в виде **Level=Full Pool=Pool-name-Full**, **Level=Differential Pool=Pool-name-Diff**, **Level=Incremental Pool=Pool-name-Incr**. Эти записи равнозначны и выбор зависит от того, хотите ли вы использовать одно общее расписание для 
-> разных задач, или каждой задаче ссответствует свое расписание.
+> Можно заметить, что пул томов, на которые производится резервное копирование, может быть задан как в ресурсе **Job** в виде 
+>  - **Full Backup Pool = Pool-name-Full**, 
+>  - **Differential Backup Pool = Pool-name-Diff**, 
+>  - **Incremental Backup Pool = Pool-name-Incr**,
+> а также в ресурсе **Schedule** в виде 
+>  - **Level=Full Pool=Pool-name-Full**, 
+>  - **Level=Differential Pool=Pool-name-Diff**, 
+>  - **Level=Incremental Pool=Pool-name-Incr**. 
+> Эти записи равнозначны и выбор зависит от того, хотите ли вы использовать одно общее расписание для разных задач, или каждой задаче ссответствует свое расписание.
