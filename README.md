@@ -115,7 +115,7 @@ bacula=# \dt
 (26 строк)
 ```
 
-#### Настройка на сервере
+#### Настройка на сервере. Director
 Для того, чтобы пользователь (_vagrant_ в данном случае) мог пользоваться графическим приложением _Bacula Admin Tool - bat_, добавим его в группу _bacula_. 
 ```
 root@debian12:/etc/bacula# usermod -a -G bacula vagrant
@@ -718,3 +718,78 @@ Pool {
   Label Format = "Clnt1-fs-Incr-"
 }
 ```
+#### Настройка на сервере. Storage Daemon
+
+Блок общих настроек:
+```
+#
+# Default Bacula Storage Daemon Configuration file
+#
+#  For Bacula release 9.6.7 (10 December 2020) -- debian bookworm/sid
+#
+# You may need to change the name of your tape drive
+#   on the "Archive Device" directive in the Device
+#   resource.  If you change the Name and/or the
+#   "Media Type" in the Device resource, please ensure
+#   that dird.conf has corresponding changes.
+#
+#
+# Copyright (C) 2000-2020 Kern Sibbald
+# License: BSD 2-Clause; see file LICENSE-FOSS
+#
+
+Storage {                             # definition of myself
+  Name = debian12-sd
+  SDPort = 9103                  # Director's port
+  WorkingDirectory = "/var/lib/bacula"
+  Pid Directory = "/run/bacula"
+  Plugin Directory = "/usr/lib/bacula"
+  Maximum Concurrent Jobs = 20
+  SDAddress = 0.0.0.0
+}
+```
+Здесь я изменил только сетевой адрес, на котором _Storage Daemon_ ожидает подключения.
+
+Блок _Director_:
+```
+#
+# List Directors who are permitted to contact Storage daemon
+#
+Director {
+  Name = debian12-dir
+  Password = "OfxoJ1unN7aMOCzwZ8ag8J5eGdN1de4vK"
+}
+
+#
+# Restricted Director, used by tray-monitor to get the
+#   status of the storage daemon
+#
+Director {
+  Name = debian12-mon
+  Password = "FMv1iAMurQAXi1__VQydNI3C-fyOkAyaL"
+  Monitor = yes
+}
+```
+Здесь указаны параметры подключения к демону со стороны Директора и службы _Tray-monitor_.
+
+Блок _Device_:
+```
+Device {
+  Name = FileStorage
+  Media Type = File
+  Archive Device = /var/lib/bacula/storage
+  LabelMedia = yes;                   # lets Bareos label unlabeled media
+  Random Access = yes;
+  AutomaticMount = yes;               # when device opened, read it
+  RemovableMedia = no;
+  AlwaysOpen = no;
+  Description = "File device. A connecting Director must have the same Name and MediaType."
+}
+```
+Здесь:
+  - **Media Type** - Тип носителя, поддерживаемый этим устройством, например, _"DLT7000"_. Имена типов носителя произвольны, поскольку вы можете задать им все, что захотите, но они должны быть известны _volume database_, чтобы отслеживать, какие из _Storage Daemons_ могут читать какие тома. В общем случае, каждый отдельный тип хранилища должен иметь уникальный тип носителя, связанный с ним. Та же строка имени должна появляться в соответствующем определении ресурса хранилища в файле конфигурации _Director_.
+  - **Archive Device** - Системное имя файла устройства хранения, управляемого этим демоном хранения. Обычно это будет имя файла устройства съемного устройства хранения (ленточного накопителя), например _"/dev/nst0"_ или _"/dev/rmt/0mbn"_. Для _DVD-рекордера_ это будет, например, _/dev/hdc_. Это также может быть имя каталога, если вы архивируете на дисковом хранилище. В этом случае вы должны указать полный абсолютный путь к каталогу.
+  - **LabelMedia** - Автоматическая разметка томов.
+  - **Random Access** - Если указано **Yes**, предполагается, что архивное устройство является носителем с произвольным доступом, который поддерживает _lseek_ (или _lseek64_, если _Largefile_ включен во время настройки). Для всех файловых систем, таких как _DVD_, _USB_ и фиксированные файлы, следует установить значение **Yes**. Для устройств с непроизвольным доступом, таких как ленты и именованные каналы, следует установить значение **No**.
+  - **AlwaysOpen** - Если установлено значение **Yes** (по умолчанию), _Bacula_ всегда будет держать устройство открытым, если оно специально не размонтировано программой _Console_. Это позволяет _Bacula_ гарантировать, что ленточный накопитель всегда доступен и правильно расположен. Если вы установите _AlwaysOpen_ на **no** , _Bacula_ будет открывать накопитель только при необходимости, а в конце задания, если никакие другие задания не используют накопитель, он будет освобожден. В следующий раз, когда _Bacula_ захочет добавить ленту на освобожденный накопитель, _Bacula_ перемотает ленту и установит ее в конец. Чтобы избежать ненужного позиционирования ленты и свести к минимуму ненужное вмешательство оператора, настоятельно рекомендуется установить _Always Open_ = **yes** . Это также гарантирует, что накопитель будет доступен, когда он понадобится _Bacula_.
+
