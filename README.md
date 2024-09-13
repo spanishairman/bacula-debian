@@ -579,16 +579,28 @@ Messages {
 
 ```
 Pool {
-  Name = Clnt1-fs-Full
-  Pool Type = Backup
+  Name = Clnt1-fs-Monthly
+  Pool Type = Backup  
   Recycle = yes                         # Bacula can automatically recycle Volumes
-  AutoPrune = yes                       # Prune expired volumes
-  Recycle Oldest Volume = yes		# Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
+  AutoPrune = yes                       # Prune expired volumes  
+  Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
   Volume Retention = 365  days          # How long should the Full Backups be kept? (#06)
   Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
-  Maximum Volume Jobs = 12              # One Job = One Vol
-  Maximum Volumes = 1                   # Limit number of Volumes in Pool
-  Label Format = "Clnt1-fs-Full-"        # Volumes will be labeled "Full-<volume-id>"
+  Maximum Volume Jobs = 1               # One Job = One Vol
+  Maximum Volumes = 12                  # Limit number of Volumes in Pool
+  Label Format = "Clnt1-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
+}
+Pool {
+  Name = Clnt1-fs-Full
+  Pool Type = Backup
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes 
+  Volume Retention = 92  days
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 1
+  Maximum Volumes = 4
+  Label Format = "Clnt1-fs-Full-"
 }
 Pool {
   Name = Clnt1-fs-Diff
@@ -596,9 +608,9 @@ Pool {
   Recycle = yes                         
   AutoPrune = yes                       
   Recycle Oldest Volume = yes           
-  Volume Retention = 30  days          
-  Maximum Volume Bytes = 4G
-  Maximum Volume Jobs = 1              
+  Volume Retention = 31  days          
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 31              
   Maximum Volumes = 2                   
   Label Format = "Clnt1-fs-Diff-"
 }
@@ -608,9 +620,9 @@ Pool {
   Recycle = yes  
   AutoPrune = yes
   Recycle Oldest Volume = yes
-  Volume Retention = 20  days 
-  Maximum Volume Bytes = 10G 
-  Maximum Volume Jobs = 16  
+  Volume Retention = 7   days 
+  Maximum Volume Bytes = 1G 
+  Maximum Volume Jobs = 22  
   Maximum Volumes = 2
   Label Format = "Clnt1-fs-Incr-"
 }
@@ -619,10 +631,14 @@ Pool {
   - **Recycle** - Эта директива определяет, могут ли быть использованы повторно очищенные тома (_Purged Volumes_). Если установлено значение **yes** (по умолчанию) и _Bacula_ нужен том, но не находится ни одного присоединяемого, она будет искать и перерабатывать (повторно использовать) (_recycle (reuse)_) очищенные тома (т. е. тома со всеми просроченными заданиями и файлами, которые, таким образом, удалены из каталога). Если том переработан, все предыдущие данные, записанные в этот том, будут перезаписаны. Если для _Recycle_ установлено значение **no**, том не будет переработан, и, следовательно, данные останутся действительными. Если вы хотите повторно использовать (перезаписать) (_reuse (re-write)_) том, а флаг переработки равен **no** (0 в базе данных _Catalog_), вы можете вручную установить флаг переработки (_recycle flag_) с помощью команды `update Volume` для тома, который будет повторно использован.
   - **AutoPrune** - Если _AutoPrune_ установлен на **yes** (по умолчанию), _Bacula_ (версия 1.20 или выше) автоматически применит _Volume Retention period_, когда потребуется новый том и в пуле не будет томов, которые можно добавить. Удаление тома приводит к удалению из каталога просроченных заданий (старше периода хранения тома) и позволяет возможно повторно использовать том.
   - **Recycle Oldest Volume** - Эта директива предписывает _Director_ искать самый старый используемый том в пуле, когда _Storage daemon_ запрашивает другой том, но ни один не доступен. Затем _Catalog_ очищается с учетом периодов хранения всех файлов и заданий, записанных в этот том. Если все задания (_Job_) очищены (т. е. том очищен), то том перерабатывается (_recycled_) и будет использоваться в качестве следующего тома для записи. Эта директива учитывает любые периоды хранения заданий, файлов или томов, которые вы могли указать, и поэтому гораздо лучше использовать эту директиву, чем _Purge Oldest Volume_.
-  - **Volume Retention** - 
-  - **Maximum Volume Bytes** - 
-  - **Maximum Volume Jobs** - 
-  - **Maximum Volumes** - 
+  - **Volume Retention** - Директива _Volume Retention_ определяет период времени, в течение которого _Bacula_ будет хранить записи, связанные с томом, в базе данных _Catalog_ после времени окончания каждого задания, записанного в том. Когда этот период времени истекает, и если **_AutoPrune_** установлено на **yes**, _Bacula_ может обрезать (удалить) (_prune (remove)_) записи заданий, которые старше указанного периода хранения тома, если это необходимо для освобождения тома. Переработка не будет происходить до тех пор, пока не возникнет абсолютная необходимость освободить том (т. е. не будет другого доступного для записи тома). Все записи файлов, связанные с усечёнными заданиями, также удаляются. Время может быть указано в секундах, минутах, часах, днях, неделях, месяцах, кварталах или годах. Хранение тома применяется независимо от периодов хранения заданий и хранения файлов , определенных в ресурсе клиента. Это означает, что все периоды хранения применяются по очереди, и что более короткий период является тем, который фактически имеет приоритет. Обратите внимание, что когда период сохранения тома истекает и необходимо получить новый том, _Bacula_ удалит записи _Job_ и _File_. Это удалит также во время команды `status dir` , поскольку она использует похожие алгоритмы для поиска следующего доступного тома.
+>[!NOTE]
+> Важно знать, что когда период сохранения тома истекает, _Bacula_ не перерабатывает том автоматически. Она пытается сохранить данные тома нетронутыми как можно дольше, прежде чем перезаписать том.
+  - **Maximum Volume Bytes** - Эта директива определяет максимальное количество байтов, которое может быть записано в том. Если указать ноль (по умолчанию), то ограничений нет, за исключением физического размера тома. В противном случае, когда количество байтов, записанных в том, равно размеру, том будет помечен как Used . Когда том помечен как **_Used_**, он больше не может использоваться для добавления заданий, как и статус **_Full_**, но его можно переработать, если включена переработка, и, таким образом, том может быть повторно использован после переработки. Это значение проверяется, и статус **_Used_** устанавливается, пока задание записывает данные в определенный том.
+  - **Maximum Volume Jobs** - Эта директива определяет максимальное количество заданий, которые могут быть записаны в том. Если указать ноль (по умолчанию), ограничений нет. В противном случае, когда количество заданий, сохраненных в томе, равно положительному целому числу, том будет помечен как **_Used_**. Когда том помечен как **_Used_**, он больше не может использоваться для добавления заданий, как и статус **_Full_**, но его можно переработать, если включена переработка, и, таким образом, использовать снова. Установив **_MaximumVolumeJobs_** в единицу, вы получите тот же эффект, что и при установке **_UseVolumeOnce = yes_**.
+>[!NOTE]
+>Значение, определенное этой директивой в файле _bacula-dir.conf_, является значением по умолчанию, используемым при создании тома. После создания тома изменение значения в файле _bacula-dir.conf_ не изменит то, что хранится для тома. Чтобы изменить значение для существующего тома, необходимо использовать команду `update volume` в консоли.
+  - **Maximum Volumes** - Эта директива определяет максимальное количество томов (лент или файлов), содержащихся в пуле. Эта директива необязательна, если ее пропустить или установить в ноль, будет разрешено любое количество томов. В целом, эта директива полезна для Autochanger, где есть фиксированное количество томов, или для хранилища файлов, где вы хотите убедиться, что резервные копии, сделанные на дисковых файлах, не станут слишком многочисленными или не займут слишком много места.
 
 >[!IMPORTANT] 
 > **Purge Oldest Volume** - Эта директива предписывает _Director_ искать самый старый используемый Том (_Volume_) в Пуле (_Pool_), когда _Storage daemon_ запрашивает другой _Volume_, но ни один не доступен. Затем _Catalog_ очищается независимо от сроков хранения всех Файлов (_Files_) и Заданий (_Jobs_), записанных в этот Том (_Volume_). Затем Том (_Volume_)перерабатывается и будет использоваться в качестве следующего _Volume_ для записи. Эта директива переопределяет любые сроки хранения Заданий, Файлов или Томов (_Jobs, Files, Volumes_), которые вы могли указать.
@@ -632,3 +648,73 @@ Pool {
 > Обратите внимание, что _Purge Oldest Volume_ игнорирует все периоды хранения (_Retention periods_). Если у вас определен только один том и вы включаете эту переменную, этот том всегда будет немедленно перезаписан при заполнении! Поэтому как минимум убедитесь, что у вас есть приличное количество томов в вашем пуле, прежде чем запускать какие-либо задания. Если вы хотите, чтобы применялись периоды хранения, **не используйте эту директиву**!. Чтобы указать период хранения, используйте директиву _Volume Retention_ (см. выше).
 >
 > Настоятельно рекомендуется **не использовать эту директиву**, поскольку наверняка когда-нибудь _Bacula_ переработает том, содержащий текущие данные. Значение по умолчанию — **no** .
+
+Исходя из вышеуказанного, рассмотрим наш пул _Clnt1-fs-Monthly_, предназначенный для хранения полных (Full)  резервных копий в течение года (365 дней). Здесь, с помощью параметра `Maximum Volume Jobs = 1` мы задали хранение одного задания резервного копирования в каждом томе, максимальное количество томов в пуле задано с помощью параметра `Maximum Volumes = 12`. Срок хранения тома до того, когда он сможет быть перезаписан определяется параметром `Volume Retention = 365  days`
+
+Примерно такого же эффекта можно достичь, изменим кол-во томов в пуле и время их хранения, например, вот так:
+```
+Volume Retention = 28  days            # How long should the Full Backups be kept? (#06)
+Maximum Volume Bytes = 12G             # Limit Volume size to something reasonable
+Maximum Volume Jobs = 12               # One Job = One Vol
+Maximum Volumes = 1                    # Limit number of Volumes in Pool
+```
+Отличие здесь в том, что когда _Storage Daemon_ заполнит том двенадцатью заданиями, он перезапишет единственный имеющийся том и раз в год мы будем терять все архивы, записанные в течение года на данный том. Чтобы избежать подобной ситуации, кол-во томов в пуле можно увеличить до двух. Также рекомендуется увеличить значение параметра `Volume Retention` Вот так:
+```
+Volume Retention = 365  days           # How long should the Full Backups be kept? (#06)
+Maximum Volume Bytes = 12G             # Limit Volume size to something reasonable
+Maximum Volume Jobs = 12               # One Job = One Vol
+Maximum Volumes = 2                    # Limit number of Volumes in Pool
+```
+Аналогичным образом настраиваются пулы томов _Clnt1-fs-Full_, _Clnt1-fs-Diff_, _Clnt1-fs-Incr_ - для полных, разностноых и инкрементных резервных копий.
+
+Теперь создадим пулы для нашего второго клиента:
+```
+Pool {
+  Name = Clnt2-fs-Monthly
+  Pool Type = Backup  
+  Recycle = yes                         # Bacula can automatically recycle Volumes
+  AutoPrune = yes                       # Prune expired volumes  
+  Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
+  Volume Retention = 365  days          # How long should the Full Backups be kept? (#06)
+  Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
+  Maximum Volume Jobs = 1               # One Job = One Vol
+  Maximum Volumes = 12                  # Limit number of Volumes in Pool
+  Label Format = "Clnt1-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
+}
+Pool {
+  Name = Clnt2-fs-Full
+  Pool Type = Backup
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes
+  Volume Retention = 92  days
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 1
+  Maximum Volumes = 4
+  Label Format = "Clnt1-fs-Full-"
+}
+Pool {
+  Name = Clnt2-fs-Diff
+  Pool Type = Backup
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes           
+  Volume Retention = 31  days          
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 31
+  Maximum Volumes = 2                   
+  Label Format = "Clnt1-fs-Diff-"
+}  
+Pool {
+  Name = Clnt2-fs-Incr
+  Pool Type = Backup  
+  Recycle = yes  
+  AutoPrune = yes    
+  Recycle Oldest Volume = yes
+  Volume Retention = 7   days 
+  Maximum Volume Bytes = 1G 
+  Maximum Volume Jobs = 22  
+  Maximum Volumes = 2
+  Label Format = "Clnt1-fs-Incr-"
+}
+```
