@@ -207,7 +207,7 @@ JobDefs {
 >
 > Даже если вы используете _переопределения_ параметров _Pool_, _Full Backup Pool_, _Differential Backup Pool_ или _Incremental Backup Pool_, _задачи_ в ресурсе _Schedule_, параметр _Pool_ должен присутствовать в ресурсе _Job_ или _JobDefs_, на который ссылается _Job_.
 >
-> Также он должен быть задан в ресурсе _Job_ или _JobDefs_, на который ссылается _Job_ независимо от наличия в ресурсе задачи параметров _Full Backup Pool_, _Differential Backup Pool_ или _Incremental Backup Pool_.
+> Также он должен быть задан в ресурсе _Job_ или _JobDefs_, на который ссылается _Job_, независимо от наличия в ресурсе задачи параметров _Full Backup Pool_, _Differential Backup Pool_ или _Incremental Backup Pool_.
 
 Пулы в каждой задаче свои и будут содержать тома только одного клиента - это необязательное условие, просто здесь я выбрал такой принцип для наглядности.
 
