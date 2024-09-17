@@ -151,42 +151,42 @@ Director {                            # define myself
   Maximum Concurrent Jobs = 20
   Password = "QU3EOkh3mnNp1oe4DLbXCJ4uRLaWZMxVD"         # Console password
   Messages = Daemon
-  DirAddress = 0.0.0.0  
+  DirAddress = 127.0.0.1
 }
 ```
-Здесь мы изменили сетевой адрес, на котором доступен демон _Director_, остальные настройки остались от установщика.
+Если _bconsole_ будет использоваться не только на данной машине, то сетевой адрес, на котором доступен демон _Director_, нужно будет изменить, например, на `0.0.0.0`, остальные настройки можно оставить как есть.
 
 ##### Блок настроек Jobdefs
 _Шаблоны задач_. Некоторые параметры для различных задач _Job_ могут повторяться. Поэтому их можно вынести в блоки _Jobdefs_, чтобы затем ссылаться на них из директив _Job_ для сокращения, таким образом, 
-количества настроек и более простого чтения конфигурационного файла. 
+количества настроек и более простого чтения конфигурационного файла. По умолчанию, конфигурационный файл _bacula-dir.conf_ уже содержит минимальный набор параметров, здесь я привенду только те, которые добавил сам.
 ```
 JobDefs {
   Name = "My-Full-Tpl"
   Type = Backup
   Level = Full
-  Storage = FileSD
+  Storage = debian12-sd
   Messages = Standard
   SpoolAttributes = yes
   Priority = 10
   Write Bootstrap = "/var/lib/bacula/%c.bsr"
 }
- 
+
 JobDefs {
   Name = "My-Diff-Tpl"
   Type = Backup
   Level = Differential
-  Storage = FileSD
+  Storage = debian12-sd
   Messages = Standard
   SpoolAttributes = yes
   Priority = 10
   Write Bootstrap = "/var/lib/bacula/%c.bsr"
 }
- 
+
 JobDefs {
   Name = "My-Incr-Tpl"
   Type = Backup
   Level = Incremental
-  Storage = FileSD
+  Storage = debian12-sd
   Messages = Standard
   SpoolAttributes = yes
   Priority = 10
@@ -199,9 +199,14 @@ JobDefs {
 > Job - Задание в _Bacula_ - это ресурс конфигурации, который определяет работу, которую _Bacula_ должна выполнить для резервного копирования или восстановления конкретного клиента. Он состоит из типа (резервное копирование, восстановление, проверка и т.д.), Уровня (полный, дифференциальный, инкрементный и т.д.), Набора файлов и хранилища, для которого необходимо создать резервные копии файлов (устройство хранения, пул носителей). 
 
 Создадим две задачи - _Clnt1-fs-Job_ и _Clnt2-fs-Job_, в которых будут архивироваться каталоги, перечисленные в параметрах _FileSet = "My-fs-FS"_ и _FileSet = "My-tfs-FS"_. 
-Параметры _FileSet_ могут быть общими для разных задач и клиентов.  Далее в конфигурационном файле мы зададим для них списки каталогов, подлежащих резервному копированию.
+Параметры _FileSet_ могут быть общими для разных задач и клиентов.  Далее, в конфигурационном файле, мы зададим для данных параметров списки каталогов, подлежащих резервному копированию.
 
-Также, в одной из задач (_Job_) перечислены пулы для каждого из трёх типов резервных копий - полная, разностная и инкрементная. Для задания пулов во второй задаче мы восмользовались функцией _переопределения_, которая доступна для ресурса _Schedule_. 
+Также, в одной из задач (_Job_) перечислены пулы для каждого из трёх типов резервных копий - полная, разностная и инкрементная. Для задания пулов во второй задаче мы восмользовались функцией _переопределения_, которая доступна для ресурса _Schedule_.
+> [!NOTE]
+> Параметр _Pool_ для ресурса _Job_ является обязательным.
+> Даже если вы используете _переопределения_ параметров _Pool_, _Full Backup Pool_, _Differential Backup Pool_ или _Incremental Backup Pool_, _задачи_ в ресурсе _Schedule_, параметр _Pool_ должен присутствовать в ресурсе _Job_ или _JobDefs_, на который ссылается _Job_.
+> Также он должен быть задан в ресурсе _Job_ или _JobDefs_, на который ссылается _Job_ независимо от наличия в ресурсе задачи параметров _Full Backup Pool_, _Differential Backup Pool_ или _Incremental Backup Pool_.
+
 Пулы в каждой задаче свои и будут содержать тома только одного клиента - это необязательное условие, просто здесь я выбрал такой принцип для наглядности.
 
 _Расписание_ (_Schedule_) - также для каждого клиента своё.
@@ -228,14 +233,27 @@ Job {
   ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
   ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
 }
-
+ 
 Job {
   Name = "Clnt2-fs-Job"
   Type = Backup
   FileSet = "My-fs-FS"
+  Pool = Clnt2-fs-Full
   Schedule = "Clnt2-fs-Sdl"
   JobDefs = "My-Full-Tpl"
   Client = "Debian12cl2-fd"
+}
+
+Job {
+  Name = "MyRestoreFiles"
+  Type = Restore
+  Client=debian12-fd
+  Storage = debian12-sd
+# The FileSet and Pool directives are not used by Restore Jobs  but must not be removed
+  FileSet="Full Set"
+  Pool = File
+  Messages = Standard
+  Where = /bacula-restores
 }
 ```
 
@@ -263,6 +281,22 @@ Job {
 > Ресурс FileSet определяет, какие файлы должны быть включены в задании резервного копирования или исключены из него. Набор файлов требуется для каждого задания резервного копирования. Он состоит из списка файлов или каталогов, которые необходимо включить, списка файлов или каталогов, которые необходимо исключить, и различных параметров резервного копирования, таких как сжатие, шифрование и подписи, которые должны применяться к каждому файлу.
 
 ```
+FileSet {
+  Name = "My-tfs-FS"
+  Enable VSS = yes
+  Include {
+    Options {
+      Signature = SHA1
+      Compression = GZIP
+      No Atime = yes
+      Sparse = yes
+      Checkfilechanges = yes
+      IgnoreCase = no
+    }
+    File = "/bacula-backup/backup.tar"
+  }
+}
+
 FileSet {
   Name = "My-fs-FS"
   Enable VSS = yes
@@ -348,13 +382,13 @@ Schedule {
   Enabled = yes
   Name = "Clnt1-fs-Sdl"
   Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00
-  Run = Level=Full at 01:00    
+  Run = Level=Full at 01:00
   Run = Level=Differential at 13:00
   Run = Level=Incremental 2-12
   Run = Level=Incremental 14-23
   Run = Level=Incremental on 2-31 at 00:00
 }
- 
+
 Schedule {
   Enabled = yes
   Name = "Clnt2-fs-Sdl"
@@ -381,9 +415,9 @@ Schedule {
   Run = Level=Incremental Pool=Clnt2-fs-Incr at 20:00
   Run = Level=Incremental Pool=Clnt2-fs-Incr at 21:00
   Run = Level=Incremental Pool=Clnt2-fs-Incr at 22:00
-  Run = Level=Incremental Pool=Clnt2-fs-Incr at 23:00 
+  Run = Level=Incremental Pool=Clnt2-fs-Incr at 23:00
   Run = Level=Incremental Pool=Clnt2-fs-Incr on 2-31 at 00:00
-} 
+}
 ```
 В данном примере для расписания с именем _Clnt1-fs-Sdl_ действуют следующие задания:
   - **Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00** - выполняет полное резервное копировние в 00:00 каждого первого числа месяца, копия будет храниться на отдельном пуле томов в течение года;
@@ -393,7 +427,7 @@ Schedule {
   - **Run = Level=Incremental 14-23** - инкрементная копия каждый час с 14 до 23 на том со сроком хранения - 7 дней;
   - **Run = Level=Incremental on 2-31 at 00:00** - инкрементная копия, выполняется в полночь кроме дня (1-е число каждого месяца), когда создается полная копия со сроком хранения 1 год.
 
-Директива _Run_ определяет, когда _задание_ должно быть выполнено, а также задаёт переопределения, если таковые имеются для применения. Вы можете указать несколько директив _Run_ в ресурсе _Schedule_. Если вы это сделаете, все они будут применены (т.е. несколько расписаний). Если у вас есть две директивы _Run_, которые запускаются одновременно, два задания запускаются одновременно (ну, в течение одной секунды друг от друга).
+Директива _Run_ определяет, когда _задание_ должно быть выполнено, а также задаёт _переопределения_, если таковые имеются для применения. Вы можете указать несколько директив _Run_ в ресурсе _Schedule_. Если вы это сделаете, все они будут применены (т.е. несколько расписаний). Если у вас есть две директивы _Run_, которые запускаются одновременно, два задания запускаются одновременно (ну, в течение одной секунды друг от друга).
 
 Переопределения заданий (Job-overrides) позволяют переопределять спецификации Уровня (Level), Хранилища (Storage), Сообщений (Messages) и Пула (Pool), представленные в ресурсе _задание_ (Job resource). Кроме того, спецификации _FullPool_, _IncrementalPool_ и _DifferentialPool_ позволяют переопределять спецификацию пула в зависимости от того, какой уровень заданий резервного копирования действует.
 
@@ -413,12 +447,12 @@ Schedule {
   - **SpoolData=yes|no** - говорит _Bacula_ использовать или не использовать буферизацию (spooling) для конкретной Задачи.
 
 > [!NOTE]
-> Можно заметить, что пул томов, на которые производится резервное копирование, может быть задан как в ресурсе **Job** в виде 
+> Можно заметить, что пул томов, на которые производится резервное копирование, может быть задан как в ресурсе **Job** в виде:
 >  - **Full Backup Pool = Pool-name-Full**, 
 >  - **Differential Backup Pool = Pool-name-Diff**, 
 >  - **Incremental Backup Pool = Pool-name-Incr**,
 >
-> а также в ресурсе **Schedule** в виде 
+> а также в ресурсе **Schedule** в виде _преопределений_, о которых была сказано ранее: 
 >  - **Level=Full Pool=Pool-name-Full**, 
 >  - **Level=Differential Pool=Pool-name-Diff**, 
 >  - **Level=Incremental Pool=Pool-name-Incr**. 
@@ -465,10 +499,10 @@ Client {
   Job Retention = 6 months            # six months
   AutoPrune = yes                     # Prune expired Jobs/Files
 }
- 
+
 # Client (File Services) to backup
 Client {
-  Name = Debian12cl1      
+  Name = Debian12cl1-fd
   Address = 192.168.121.11
   FDPort = 9102
   Catalog = MyCatalog
@@ -480,7 +514,7 @@ Client {
  
 # Client (File Services) to backup
 Client {
-  Name = Debian12cl2     
+  Name = Debian12cl2-fd
   Address = 192.168.121.12
   FDPort = 9102
   Catalog = MyCatalog
@@ -488,7 +522,7 @@ Client {
   File Retention = 365 days           # 60 days
   Job Retention = 12 months           # six months
   AutoPrune = yes                     # Prune expired Jobs/Files
-}
+} 
 ```
 Здесь:
   - **File Retention = time-period-specification** - Директива _File Retention_ определяет период времени, в течение которого _Bacula_ будет хранить записи _File_ в базе данных _Catalog_ после времени окончания задания, соответствующего записям _File_. По истечении этого периода времени, и если _AutoPrune_ установлено на yes, _Bacula_ удалит (обрежет) записи _File_, которые старше указанного периода _File Retention_. Обратите внимание, что это влияет только на записи в базе данных _Catalog_. Это не влияет на ваши резервные копии архива. Записи файлов могут фактически храниться в течение более короткого периода, чем вы указали в этой директиве, если вы укажете более короткий период хранения _Job Retention_ или более короткий период хранения _Volume Retention_ . Самый короткий период хранения из трех имеет приоритет. Время может быть выражено в секундах, минутах, часах, днях, неделях, месяцах, кварталах или годах. Значение по умолчанию — 60 дней.
@@ -568,6 +602,21 @@ Messages {
   - **Mail** - Отправить сообщение на адреса электронной почты, указанные в виде списка, разделенного запятыми (без пробела) в поле адреса. Сообщения электронной почты группируются во время выполнения задания, а затем отправляются как одно сообщение электронной почты после завершения задания. Преимущество этого назначения заключается в том, что мы получаем уведомление о каждом запущенном задании. Однако, если мы выполняем резервное копирование нескольких машин каждую ночь, количество сообщений электронной почты может раздражать. Некоторые пользователи используют программы-фильтры, такие как procmail, для автоматической регистрации этого сообщения электронной почты на основе кода завершения задания.
   - **Operator** - Отправлять сообщение на адреса электронной почты, указанные в виде списка, разделенного запятыми (без пробела) в поле адреса. Это похоже на директиву _Mail_ выше, за исключением того, что каждое сообщение отправляется по мере получения. Таким образом, на каждое сообщение приходится одно электронное письмо. Это наиболее полезно для сообщений о монтировании.
 
+###### Хранилище - Storage
+Параметры для подключения к службе _Storage Daemon_. Здесь также указано устройство хранения - `FileStorage`
+```
+Storage {
+  Name = debian12-sd
+# Do not use "localhost" here
+  Address = 192.168.121.10                # N.B. Use a fully qualified name here
+  SDPort = 9103
+  Password = "gYnV07jAsfPmX-mFbmXAsE0QrAve2TK9i"
+  Device = FileStorage
+  Media Type = File
+  Maximum Concurrent Jobs = 10        # run up to 10 jobs a the same time
+}
+```
+
 ###### Пулы томов - Pool
 
 Пулы объединяют тома таким образом, чтобы резервная копия не ограничивалась длиной одного тома (ленты). Следовательно, вместо того, чтобы явно указывать тома в своих заданиях, вы указываете пул и Bacula выберет следующий добавляемый том из пула и смонтирует его. Прежде чем Bacula будет читать или записывать том, физический том должен иметь метку программного обеспечения Bacula, чтобы Bacula мог быть уверен, что установлен правильный том. В зависимости от конфигурации это может быть сделано Bacula автоматически или вручную с помощью команды label в bconsole. 
@@ -578,11 +627,12 @@ Messages {
 Настроить _Bacula_ для записи на диск, а не на ленту довольно просто. В файле конфигурации  _Storage daemon_ вы просто определяете с помощью директивы «File» в качестве устройства архивации каталог (_Storage Daemon → Device_). Здесь же настраивается каталог по умолчанию для хранения резервных копий на диске /var/lib/bacula/storage (директива _Archive Device_). 
 
 ```
+# File Pool definition Clnt1-fs
 Pool {
   Name = Clnt1-fs-Monthly
-  Pool Type = Backup  
+  Pool Type = Backup
   Recycle = yes                         # Bacula can automatically recycle Volumes
-  AutoPrune = yes                       # Prune expired volumes  
+  AutoPrune = yes                       # Prune expired volumes
   Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
   Volume Retention = 365  days          # How long should the Full Backups be kept? (#06)
   Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
@@ -595,7 +645,7 @@ Pool {
   Pool Type = Backup
   Recycle = yes
   AutoPrune = yes
-  Recycle Oldest Volume = yes 
+  Recycle Oldest Volume = yes
   Volume Retention = 92  days
   Maximum Volume Bytes = 1G
   Maximum Volume Jobs = 1
@@ -605,24 +655,74 @@ Pool {
 Pool {
   Name = Clnt1-fs-Diff
   Pool Type = Backup
-  Recycle = yes                         
-  AutoPrune = yes                       
-  Recycle Oldest Volume = yes           
-  Volume Retention = 31  days          
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes
+  Volume Retention = 31  days
   Maximum Volume Bytes = 1G
-  Maximum Volume Jobs = 31              
-  Maximum Volumes = 2                   
+  Maximum Volume Jobs = 31
+  Maximum Volumes = 2
   Label Format = "Clnt1-fs-Diff-"
 }
 Pool {
   Name = Clnt1-fs-Incr
-  Pool Type = Backup 
-  Recycle = yes  
+  Pool Type = Backup
+  Recycle = yes
   AutoPrune = yes
   Recycle Oldest Volume = yes
-  Volume Retention = 7   days 
-  Maximum Volume Bytes = 1G 
-  Maximum Volume Jobs = 22  
+  Volume Retention = 7   days
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 22
+  Maximum Volumes = 2
+  Label Format = "Clnt1-fs-Incr-"
+}
+
+# File Pool definition Clnt2-fs
+Pool {
+  Name = Clnt2-fs-Monthly
+  Pool Type = Backup
+  Recycle = yes                         # Bacula can automatically recycle Volumes
+  AutoPrune = yes                       # Prune expired volumes
+  Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
+  Volume Retention = 365  days          # How long should the Full Backups be kept? (#06)
+  Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
+  Maximum Volume Jobs = 1               # One Job = One Vol
+  Maximum Volumes = 12                  # Limit number of Volumes in Pool
+  Label Format = "Clnt1-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
+}
+Pool {
+  Name = Clnt2-fs-Full
+  Pool Type = Backup
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes
+  Volume Retention = 92  days
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 1
+  Maximum Volumes = 4
+  Label Format = "Clnt1-fs-Full-"
+}
+Pool {
+  Name = Clnt2-fs-Diff
+  Pool Type = Backup
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes
+  Volume Retention = 31  days
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 31
+  Maximum Volumes = 2
+  Label Format = "Clnt1-fs-Diff-"
+}
+Pool {
+  Name = Clnt2-fs-Incr
+  Pool Type = Backup
+  Recycle = yes
+  AutoPrune = yes
+  Recycle Oldest Volume = yes
+  Volume Retention = 7   days
+  Maximum Volume Bytes = 1G
+  Maximum Volume Jobs = 22
   Maximum Volumes = 2
   Label Format = "Clnt1-fs-Incr-"
 }
@@ -667,57 +767,6 @@ Maximum Volumes = 2                    # Limit number of Volumes in Pool
 ```
 Аналогичным образом настраиваются пулы томов _Clnt1-fs-Full_, _Clnt1-fs-Diff_, _Clnt1-fs-Incr_ - для полных, разностноых и инкрементных резервных копий.
 
-Теперь создадим пулы для нашего второго клиента:
-```
-Pool {
-  Name = Clnt2-fs-Monthly
-  Pool Type = Backup  
-  Recycle = yes                         # Bacula can automatically recycle Volumes
-  AutoPrune = yes                       # Prune expired volumes  
-  Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
-  Volume Retention = 365  days          # How long should the Full Backups be kept? (#06)
-  Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
-  Maximum Volume Jobs = 1               # One Job = One Vol
-  Maximum Volumes = 12                  # Limit number of Volumes in Pool
-  Label Format = "Clnt1-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
-}
-Pool {
-  Name = Clnt2-fs-Full
-  Pool Type = Backup
-  Recycle = yes
-  AutoPrune = yes
-  Recycle Oldest Volume = yes
-  Volume Retention = 92  days
-  Maximum Volume Bytes = 1G
-  Maximum Volume Jobs = 1
-  Maximum Volumes = 4
-  Label Format = "Clnt1-fs-Full-"
-}
-Pool {
-  Name = Clnt2-fs-Diff
-  Pool Type = Backup
-  Recycle = yes
-  AutoPrune = yes
-  Recycle Oldest Volume = yes           
-  Volume Retention = 31  days          
-  Maximum Volume Bytes = 1G
-  Maximum Volume Jobs = 31
-  Maximum Volumes = 2                   
-  Label Format = "Clnt1-fs-Diff-"
-}  
-Pool {
-  Name = Clnt2-fs-Incr
-  Pool Type = Backup  
-  Recycle = yes  
-  AutoPrune = yes    
-  Recycle Oldest Volume = yes
-  Volume Retention = 7   days 
-  Maximum Volume Bytes = 1G 
-  Maximum Volume Jobs = 22  
-  Maximum Volumes = 2
-  Label Format = "Clnt1-fs-Incr-"
-}
-```
 #### Настройка на сервере. Storage Daemon
 
 Блок общих настроек:
@@ -748,7 +797,7 @@ Storage {                             # definition of myself
   SDAddress = 0.0.0.0
 }
 ```
-Здесь я изменил только сетевой адрес, на котором _Storage Daemon_ ожидает подключения.
+Здесь поменяем только сетевой адрес, на котором _Storage Daemon_ ожидает подключения, с Localhost на 0.0.0.0. Таким образом, служба SD будет доступна для удалённых клиентов, отправляющих ей свои архивы.
 
 Блок _Director_:
 ```
