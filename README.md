@@ -924,7 +924,7 @@ tree
 │       ├── bacula-dir-schedules.conf
 │       ├── bacula-dir-storage.conf
 │       ├── bacula-sd.conf
-├── Vagrantfile
+└── Vagrantfile
 ```
 Параметры, задаваемые в данных конфигурационных файлах из каталога _files/srv_, добавляются в главный конфиг _Director_ - [bacula-dir.conf](Files/bacula-dir.conf), из каталогов _clnt1_ и _clnt2_ - заменяют параметры, созданные установщиком.
 
