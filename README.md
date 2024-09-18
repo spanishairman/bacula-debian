@@ -162,31 +162,8 @@ _Шаблоны задач_. Некоторые параметры для раз
 количества настроек и более простого чтения конфигурационного файла. По умолчанию, конфигурационный файл _bacula-dir.conf_ уже содержит минимальный набор параметров, здесь я привенду только те, которые добавил сам.
 ```
 JobDefs {
-  Name = "My-Full-Tpl"
+  Name = "My-JobDef-Tpl"
   Type = Backup
-  Level = Full
-  Storage = debian12-sd
-  Messages = Standard
-  SpoolAttributes = yes
-  Priority = 10
-  Write Bootstrap = "/var/lib/bacula/%c.bsr"
-}
-
-JobDefs {
-  Name = "My-Diff-Tpl"
-  Type = Backup
-  Level = Differential
-  Storage = debian12-sd
-  Messages = Standard
-  SpoolAttributes = yes
-  Priority = 10
-  Write Bootstrap = "/var/lib/bacula/%c.bsr"
-}
-
-JobDefs {
-  Name = "My-Incr-Tpl"
-  Type = Backup
-  Level = Incremental
   Storage = debian12-sd
   Messages = Standard
   SpoolAttributes = yes
@@ -202,7 +179,7 @@ JobDefs {
 Создадим две задачи - _Clnt1-fs-Job_ и _Clnt2-fs-Job_, в которых будут архивироваться каталоги, перечисленные в параметрах _FileSet = "My-fs-FS"_ и _FileSet = "My-tfs-FS"_. 
 Параметры _FileSet_ могут быть общими для разных задач и клиентов.  Далее, в конфигурационном файле, мы зададим для данных параметров списки каталогов, подлежащих резервному копированию.
 
-Также, в одной из задач (_Job_) перечислены пулы для каждого из трёх типов резервных копий - полная, разностная и инкрементная. Для задания пулов во второй задаче мы восмользовались функцией _переопределения_, которая доступна для ресурса _Schedule_.
+Также, в ресурсе задачи (_Job_) перечислены пулы для каждого из трёх типов резервных копий - полная, разностная и инкрементная. Для задания пулов также можно восмользоваться функцией _переопределения_, которая доступна для ресурса _Schedule_.
 > [!NOTE]
 > Параметр _Pool_ для ресурса _Job_ является обязательным.
 >
@@ -217,9 +194,21 @@ _Расписание_ (_Schedule_) - также для каждого клие�
 _Скрипты_ (_ClientRunBeforeJob_ и _ClientRunAfterJob_), выполняющиеся до и после задачи резервного копирования запускаются на клиентской машине, т.е. на стороне _File Daemon_. 
 Такие скрипты могут содержать Bash-команды по предварительному сжатию архивируемых файлов, копированию их в tar-архив или, например, sql-команды, выполняющие дамп баз данных. 
 Скрипты, выполняющиеся после задачи резервного копирования, могут содержать команды по удалению архивируемых файлов или ранее созданных tar-архивов или sql-файлов.
+Скрипт для параметра _ClientRunBeforeJob_:
+```
+#!/bin/bash
+tar -c -f /bacula-backup/backup.tar
+```
+
+Скрипт для параметра _ClientRunAfterJob_:
+```
+#!/bin/bash
+rm -rf /bacula-backup/backup.tar
+```
+
 > [!NOTE]
 > Чтобы было легче ориентироваться, для задач, пулов, расписаний и клиентов я выбрал шаблонные имена, которые содержат общие части. 
-> Например, для клиента _Debian12cl1-fd_ соответствует имя задачи _Clnt1-fs-Job_, пул _Clnt1-fs-Full_, расписание - _Clnt1-fs-Sdl_.
+> Например, для клиента _Debian12cl1-fd_ соответствует имя задачи _Clnt1-fs-Job_, пулы томов _Clnt1-fs-Full_, _Clnt1-fs-Diff_, _Clnt1-fs-Incr_ расписание - _Clnt1-fs-Sdl_.
 
 ```
 Job {
@@ -231,7 +220,7 @@ Job {
   Differential Backup Pool = Clnt1-fs-Diff
   Incremental Backup Pool = Clnt1-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
   Schedule = "Clnt1-fs-Sdl"
-  JobDefs = "My-Full-Tpl"
+  JobDefs = "My-JobDef-Tpl"
   Client = "Debian12cl1-fd"
   ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
   ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
@@ -242,8 +231,11 @@ Job {
   Type = Backup
   FileSet = "My-fs-FS"
   Pool = Clnt2-fs-Full
+  Full Backup Pool = Clnt2-fs-Full                  # write Full Backups into "Full" Pool         (#05)
+  Differential Backup Pool = Clnt2-fs-Diff
+  Incremental Backup Pool = Clnt2-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
   Schedule = "Clnt2-fs-Sdl"
-  JobDefs = "My-Full-Tpl"
+  JobDefs = "My-JobDef-Tpl"
   Client = "Debian12cl2-fd"
 }
 
@@ -260,7 +252,8 @@ Job {
 }
 ```
 
-В примере ниже описывается стандартная задача восстановления на несуществующий носитель, как говорится в описании, этого достаточно для всех наборов Jobs, Clients, Storages. Я лишь изменил каталог по умолчанию, в который будут восстанавливаться данные. 
+В примере ниже описывается стандартная задача восстановления на несуществующий носитель, как говорится в описании, этого достаточно для всех наборов Jobs, Clients, Storages. 
+Тем не менее, я создал похожую задачу, где лишь изменил каталог по умолчанию, в который будут восстанавливаться данные. Содержимое моей задачи восстановления в коде выше по тексту. 
 ```
 #
 # Standard Restore template, to be changed by Console program
@@ -281,7 +274,8 @@ Job {
 ```
 ##### Наборы файлов - FileSet
 > [!NOTE]
-> Ресурс FileSet определяет, какие файлы должны быть включены в задании резервного копирования или исключены из него. Набор файлов требуется для каждого задания резервного копирования. Он состоит из списка файлов или каталогов, которые необходимо включить, списка файлов или каталогов, которые необходимо исключить, и различных параметров резервного копирования, таких как сжатие, шифрование и подписи, которые должны применяться к каждому файлу.
+> Ресурс _FileSet_ определяет, какие файлы должны быть включены в задании резервного копирования или исключены из него. Набор файлов требуется для каждого задания резервного копирования. Он состоит из списка файлов или каталогов, которые необходимо включить, 
+> списка файлов или каталогов, которые необходимо исключить, и различных параметров резервного копирования, таких как сжатие, шифрование и подписи, которые должны применяться к каждому файлу.
 
 ```
 FileSet {
@@ -379,7 +373,9 @@ FileSet {
     File = "F:/BackUP/"
   }
 ```
+
 ##### Расписания
+Пример расписания:
 ```
 Schedule {
   Enabled = yes
@@ -449,6 +445,8 @@ Schedule {
   - **Accurate=yes|no** - говорит _Bacula_ использовать или нет точный код для конкретной работы. Это может позволить вам сэкономить память и ресурсы ЦП на сервере Catalog в некоторых случаях.
   - **SpoolData=yes|no** - говорит _Bacula_ использовать или не использовать буферизацию (spooling) для конкретной Задачи.
 
+В расписании _Clnt2-fs-Sdl_ немного изменена форма записи для демонстрации гибкости при настройке данного ресурса.
+
 > [!NOTE]
 > Можно заметить, что пул томов, на которые производится резервное копирование, может быть задан как в ресурсе **Job** в виде:
 >  - **Full Backup Pool = Pool-name-Full**, 
@@ -459,8 +457,59 @@ Schedule {
 >  - **Level=Full Pool=Pool-name-Full**, 
 >  - **Level=Differential Pool=Pool-name-Diff**, 
 >  - **Level=Incremental Pool=Pool-name-Incr**. 
-> 
-> Эти записи равнозначны и выбор зависит от того, хотите ли вы использовать одно общее расписание для разных задач, или каждой задаче ссответствует свое расписание.
+
+> [!IMPORTANT] 
+> Эти записи при определённых условиях равнозначны, но существует особенность, из-за которой не рекомендуется использовать явное указание пула томов в задаче расписания, например, в случае использования различных пулов под разные типы резервных копий.
+> Предположим, что у нас пришло время для запуска задания `Run = Level=Incremental Pool=Clnt2-fs-Incr at 14:00` из расписания `Name = "Clnt2-fs-Sdl"`, но по какой-то причине для клиента _debian12-fd_ в пулах томов отстутствуют полные и разностные копии файловых систем. Это стандартная ситуация при первоначальном запуске системы резервного копирования, когда еще нет ни одной резервной копии или при добавлении нового клиента в существующую СРК.
+> В таком случае, _Bacula_ всё-равно выполнит задачу резервного копирования, но с одним условием - будет создана **полная** _Full_ копия файловых систем, указанных в параметре _FileSet_. А, так как в ресурсе расписания _"Clnt2-fs-Sdl"_ явно указан пул _Clnt2-fs-Incr_, 
+> то данные, содержащиеся в этой **полной** копии запишутся в явно указанный пул - _Clnt2-fs-Incr_, предназначенный для инкрементных копий. Ничего страшного при этом не произойдёт, кроме того что нарушится система ротации резервных копий на томах, а также
+> на томе из "неправильного" пула может не хватить места для полной копии.
+
+Таким образом, окончательно, ресурс расписаний выглядит следующим образом:
+```
+# My Schedules
+
+Schedule {
+  Enabled = yes
+  Name = "Clnt1-fs-Sdl"
+  Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00
+  Run = Level=Full at 01:00
+  Run = Level=Differential at 13:00
+  Run = Level=Incremental 2-12
+  Run = Level=Incremental 14-23
+  Run = Level=Incremental on 2-31 at 00:00
+}
+
+Schedule {
+  Enabled = yes
+  Name = "Clnt2-fs-Sdl"
+  Run = Level=Full Pool=Clnt2-fs-Monthly on 1 at 00:00
+  Run = Level=Full Pool=Clnt2-fs-Full at 01:00
+  Run = Level=Differential at 13:00
+  Run = Level=Incremental at 02:00
+  Run = Level=Incremental at 03:00
+  Run = Level=Incremental at 04:00
+  Run = Level=Incremental at 05:00
+  Run = Level=Incremental at 06:00
+  Run = Level=Incremental at 07:00
+  Run = Level=Incremental at 08:00
+  Run = Level=Incremental at 09:00
+  Run = Level=Incremental at 10:00
+  Run = Level=Incremental at 11:00
+  Run = Level=Incremental at 12:00
+  Run = Level=Incremental at 14:00
+  Run = Level=Incremental at 15:00
+  Run = Level=Incremental at 16:00
+  Run = Level=Incremental at 17:00
+  Run = Level=Incremental at 18:00
+  Run = Level=Incremental at 19:00
+  Run = Level=Incremental at 20:00
+  Run = Level=Incremental at 21:00
+  Run = Level=Incremental at 22:00
+  Run = Level=Incremental at 23:00
+  Run = Level=Incremental on 2-31 at 00:00
+}
+```
 
 Дата/время запуска задания могут быть указаны в формате псевдо-BNF следующим образом: 
 ```
@@ -691,7 +740,7 @@ Pool {
   Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
   Maximum Volume Jobs = 1               # One Job = One Vol
   Maximum Volumes = 12                  # Limit number of Volumes in Pool
-  Label Format = "Clnt1-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
+  Label Format = "Clnt2-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
 }
 Pool {
   Name = Clnt2-fs-Full
@@ -703,7 +752,7 @@ Pool {
   Maximum Volume Bytes = 1G
   Maximum Volume Jobs = 1
   Maximum Volumes = 4
-  Label Format = "Clnt1-fs-Full-"
+  Label Format = "Clnt2-fs-Full-"
 }
 Pool {
   Name = Clnt2-fs-Diff
@@ -715,7 +764,7 @@ Pool {
   Maximum Volume Bytes = 1G
   Maximum Volume Jobs = 31
   Maximum Volumes = 2
-  Label Format = "Clnt1-fs-Diff-"
+  Label Format = "Clnt2-fs-Diff-"
 }
 Pool {
   Name = Clnt2-fs-Incr
@@ -727,7 +776,7 @@ Pool {
   Maximum Volume Bytes = 1G
   Maximum Volume Jobs = 22
   Maximum Volumes = 2
-  Label Format = "Clnt1-fs-Incr-"
+  Label Format = "Clnt2-fs-Incr-"
 }
 ```
 Здесь:
@@ -844,4 +893,1242 @@ Device {
   - **LabelMedia** - Автоматическая разметка томов.
   - **Random Access** - Если указано **Yes**, предполагается, что архивное устройство является носителем с произвольным доступом, который поддерживает _lseek_ (или _lseek64_, если _Largefile_ включен во время настройки). Для всех файловых систем, таких как _DVD_, _USB_ и фиксированные файлы, следует установить значение **Yes**. Для устройств с непроизвольным доступом, таких как ленты и именованные каналы, следует установить значение **No**.
   - **AlwaysOpen** - Если установлено значение **Yes** (по умолчанию), _Bacula_ всегда будет держать устройство открытым, если оно специально не размонтировано программой _Console_. Это позволяет _Bacula_ гарантировать, что ленточный накопитель всегда доступен и правильно расположен. Если вы установите _AlwaysOpen_ на **no** , _Bacula_ будет открывать накопитель только при необходимости, а в конце задания, если никакие другие задания не используют накопитель, он будет освобожден. В следующий раз, когда _Bacula_ захочет добавить ленту на освобожденный накопитель, _Bacula_ перемотает ленту и установит ее в конец. Чтобы избежать ненужного позиционирования ленты и свести к минимуму ненужное вмешательство оператора, настоятельно рекомендуется установить _Always Open_ = **yes** . Это также гарантирует, что накопитель будет доступен, когда он понадобится _Bacula_.
+
+### Практическая часть. Разворачивание сервера Bacula с настройками, которые были приведены в предыдущей главе
+Для развёртиывния стенда будем использовать наш [Vagrantfile](files/Vagrantfile). Также будут использоваться файлы с параметрами для сервера Bacula _Debian12_ и двух клиентов - _Debian12cl1_ и _Debian12cl2_:
+  - [bacula-dir-clients.conf](files/srv/bacula-dir-clients.conf)
+  - [bacula-dir-filesets.conf](files/srv/bacula-dir-filesets.conf)
+  - [bacula-dir-jobs.conf](files/srv/bacula-dir-jobs.conf)
+  - [bacula-dir-pools.conf](files/srv/bacula-dir-pools.conf)
+  - [bacula-dir-schedules.conf](files/srv/bacula-dir-schedules.conf)
+  - [bacula-dir-storage.conf](files/srv/bacula-dir-storage.conf)
+  - [bacula-sd.conf](files/srv/bacula-sd.conf)
+  - [bacula-fd.conf](files/clnt1/bacula-fd.conf)
+  - [bacula-fd.conf](files/clnt2/bacula-fd.conf)
+
+Параметры, задаваемые в данных конфигурационных файлах из каталога _files/srv_, добавляются в главный конфиг _Director_ - [bacula-dir.conf](Files/bacula-dir.conf), из каталогов _clnt1_ и _clnt2_ - заменяют параметры, созданные установщиком.
+
+C помощью прилагаемого [Vagrantfile](Vagrantfile) разворачиваем стенд.
+
+#### Создание резервных копий
+Логинимся на сервер и создаём полные резервные копии для файлов, перечисленных в параметре _FileSet_ для первого клиента - _Debian12cl1-fd_:
+```
+root@debian12:~# bconsole 
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*run job=
+BackupCatalog   BackupClient1   Clnt1-fs-Job    Clnt2-fs-Job    MyRestoreFiles  RestoreFiles    
+*run job=Clnt1-fs-Job 
+Using Catalog "MyCatalog"
+Run Backup job
+JobName:  Clnt1-fs-Job
+Level:    Incremental
+Client:   Debian12cl1-fd
+FileSet:  My-tfs-FS
+Pool:     Clnt1-fs-Full (From Job resource)
+Storage:  debian12-sd (From Job resource)
+When:     2024-09-17 17:13:06
+Priority: 10
+OK to run? (yes/mod/no): m
+Parameters to modify:
+     1: Level
+     2: Storage
+     3: Job
+     4: FileSet
+     5: Client
+     6: When
+     7: Priority
+     8: Pool
+     9: Plugin Options
+Select parameter to modify (1-9): 1
+Levels:
+     1: Full
+     2: Incremental
+     3: Differential
+     4: Since
+     5: VirtualFull
+Select level (1-5): 1
+Run Backup job
+JobName:  Clnt1-fs-Job
+Level:    Full
+Client:   Debian12cl1-fd
+FileSet:  My-tfs-FS
+Pool:     Clnt1-fs-Full (From Job resource)
+Storage:  debian12-sd (From Job resource)
+When:     2024-09-17 17:13:06
+Priority: 10
+OK to run? (yes/mod/no): y
+Job queued. JobId=1
+```
+Здесь мы изменили с помощью модификатора _mod_ параметры по умолчанию:
+```
+JobName:  Clnt1-fs-Job
+Level:    Incremental 
+Client:   Debian12cl1-fd
+FileSet:  My-tfs-FS
+Pool:     Clnt1-fs-Full (From Job resource)
+Storage:  debian12-sd (From Job resource)  
+When:     2024-09-17 17:13:06
+Priority: 10
+```
+на:
+```
+JobName:  Clnt1-fs-Job
+Level:    Full
+Client:   Debian12cl1-fd
+FileSet:  My-tfs-FS
+Pool:     Clnt1-fs-Full (From Job resource)
+Storage:  debian12-sd (From Job resource)  
+When:     2024-09-17 17:13:06
+Priority: 10
+```
+Т.е. изменили уровень резервной копии на _Full_.
+
+Теперь тоже самое для второго клиента - _Debian12cl2-fd_:
+```
+*run job=Clnt2-fs-Job 
+Run Backup job
+JobName:  Clnt2-fs-Job
+Level:    Incremental
+Client:   Debian12cl2-fd
+FileSet:  My-fs-FS
+Pool:     Clnt2-fs-Full (From Job resource)
+Storage:  debian12-sd (From Job resource)
+When:     2024-09-17 17:14:07
+Priority: 10
+OK to run? (yes/mod/no): m
+Parameters to modify:
+     1: Level
+     2: Storage
+     3: Job
+     4: FileSet
+     5: Client
+     6: When
+     7: Priority
+     8: Pool
+     9: Plugin Options
+Select parameter to modify (1-9): 1
+Levels:
+     1: Full
+     2: Incremental
+     3: Differential
+     4: Since
+     5: VirtualFull
+Select level (1-5): 1
+Run Backup job
+JobName:  Clnt2-fs-Job
+Level:    Full
+Client:   Debian12cl2-fd
+FileSet:  My-fs-FS
+Pool:     Clnt2-fs-Full (From Job resource)
+Storage:  debian12-sd (From Job resource)
+When:     2024-09-17 17:14:07
+Priority: 10
+OK to run? (yes/mod/no): y
+Job queued. JobId=2
+```
+Проверим статус запущенных задач через сообщения:
+```
+*messages 
+17-сен 17:13 debian12-dir JobId 1: Start Backup JobId 1, Job=Clnt1-fs-Job.2024-09-17_17.13.54_03
+17-сен 17:13 debian12-dir JobId 1: Created new Volume="Clnt1-fs-Full-0001", Pool="Clnt1-fs-Full", MediaType="File" in catalog.
+17-сен 17:13 debian12-dir JobId 1: Using Device "FileStorage" to write.
+17-сен 17:13 debian12-fd JobId 1: shell command: run ClientRunBeforeJob "/etc/bacula/scripts/bacula-before-fs.sh"
+17-сен 17:13 debian12-fd JobId 1: ClientRunBeforeJob: tar: Удаляется начальный `/' из имен объектов
+17-сен 17:13 debian12-fd JobId 1: ClientRunBeforeJob: tar: Удаляются начальные `/' из целей жестких ссылок
+17-сен 17:14 debian12-sd JobId 1: Labeled new Volume "Clnt1-fs-Full-0001" on File device "FileStorage" (/var/lib/bacula/storage).
+17-сен 17:14 debian12-sd JobId 1: Wrote label to prelabeled Volume "Clnt1-fs-Full-0001" on File device "FileStorage" (/var/lib/bacula/storage)
+17-сен 17:14 debian12-dir JobId 1: Max Volume jobs=1 exceeded. Marking Volume "Clnt1-fs-Full-0001" as Used.
+17-сен 17:14 debian12-dir JobId 2: Start Backup JobId 2, Job=Clnt2-fs-Job.2024-09-17_17.14.21_04
+17-сен 17:14 debian12-fd JobId 1: shell command: run ClientAfterJob "/etc/bacula/scripts/bacula-after-fs.sh"
+17-сен 17:14 debian12-sd JobId 1: Elapsed time=00:00:30, Transfer rate=6.501 M Bytes/second
+17-сен 17:14 debian12-sd JobId 1: Sending spooled attrs to the Director. Despooling 224 bytes ...
+17-сен 17:14 debian12-dir JobId 1: Bacula debian12-dir 9.6.7 (10Dec20):
+  Build OS:               x86_64-pc-linux-gnu debian bookworm/sid
+  JobId:                  1
+  Job:                    Clnt1-fs-Job.2024-09-17_17.13.54_03
+  Backup Level:           Full
+  Client:                 "Debian12cl1-fd" 9.6.7 (10Dec20) x86_64-pc-linux-gnu,debian,bookworm/sid
+  FileSet:                "My-tfs-FS" 2024-09-17 17:13:54
+  Pool:                   "Clnt1-fs-Full" (From Job FullPool override)
+  Catalog:                "MyCatalog" (From Client resource)
+  Storage:                "debian12-sd" (From Job resource)
+  Scheduled time:         17-сен-2024 17:13:06
+  Start time:             17-сен-2024 17:14:00
+  End time:               17-сен-2024 17:14:30
+  Elapsed time:           30 secs
+  Priority:               10
+  FD Files Written:       1
+  SD Files Written:       1
+  FD Bytes Written:       195,052,043 (195.0 MB)
+  SD Bytes Written:       195,052,159 (195.0 MB)
+  Rate:                   6501.7 KB/s
+  Software Compression:   61.5% 2.6:1
+  Comm Line Compression:  None
+  Snapshot/VSS:           no
+  Encryption:             no
+  Accurate:               no
+  Volume name(s):         Clnt1-fs-Full-0001
+  Volume Session Id:      1
+  Volume Session Time:    1726582003
+  Last Volume Bytes:      195,254,627 (195.2 MB)
+  Non-fatal FD errors:    0
+  SD Errors:              0
+  FD termination status:  OK
+  SD termination status:  OK
+  Termination:            Backup OK
+
+17-сен 17:14 debian12-dir JobId 1: Begin pruning Jobs older than 12 months .
+17-сен 17:14 debian12-dir JobId 1: No Jobs found to prune.
+17-сен 17:14 debian12-dir JobId 1: Begin pruning Files.
+17-сен 17:14 debian12-dir JobId 1: No Files found to prune.
+17-сен 17:14 debian12-dir JobId 1: End auto prune.
+
+17-сен 17:14 debian12-dir JobId 2: Created new Volume="Clnt2-fs-Full-0002", Pool="Clnt2-fs-Full", MediaType="File" in catalog.
+17-сен 17:14 debian12-dir JobId 2: Using Device "FileStorage" to write.
+17-сен 17:14 debian12-sd JobId 2: Labeled new Volume "Clnt2-fs-Full-0002" on File device "FileStorage" (/var/lib/bacula/storage).
+17-сен 17:14 debian12-sd JobId 2: Wrote label to prelabeled Volume "Clnt2-fs-Full-0002" on File device "FileStorage" (/var/lib/bacula/storage)
+17-сен 17:14 debian12-dir JobId 2: Max Volume jobs=1 exceeded. Marking Volume "Clnt2-fs-Full-0002" as Used.
+*messages
+17-сен 17:15 debian12-sd JobId 2: Elapsed time=00:00:15, Transfer rate=16.78 M Bytes/second
+17-сен 17:15 debian12-sd JobId 2: Sending spooled attrs to the Director. Despooling 3,355,574 bytes ...
+17-сен 17:15 debian12-dir JobId 2: Bacula debian12-dir 9.6.7 (10Dec20):
+  Build OS:               x86_64-pc-linux-gnu debian bookworm/sid
+  JobId:                  2
+  Job:                    Clnt2-fs-Job.2024-09-17_17.14.21_04
+  Backup Level:           Full
+  Client:                 "Debian12cl2-fd" 9.6.7 (10Dec20) x86_64-pc-linux-gnu,debian,bookworm/sid
+  FileSet:                "My-fs-FS" 2024-09-17 17:14:21
+  Pool:                   "Clnt2-fs-Full" (From Job FullPool override)
+  Catalog:                "MyCatalog" (From Client resource)
+  Storage:                "debian12-sd" (From Job resource)
+  Scheduled time:         17-сен-2024 17:14:07
+  Start time:             17-сен-2024 17:14:53
+  End time:               17-сен-2024 17:15:09
+  Elapsed time:           16 secs
+  Priority:               10
+  FD Files Written:       13,887
+  SD Files Written:       13,887
+  FD Bytes Written:       249,852,594 (249.8 MB)
+  SD Bytes Written:       251,802,548 (251.8 MB)
+  Rate:                   15615.8 KB/s
+  Software Compression:   49.3% 2.0:1
+  Comm Line Compression:  2.0% 1.0:1
+  Snapshot/VSS:           no
+  Encryption:             no
+  Accurate:               no
+  Volume name(s):         Clnt2-fs-Full-0002
+  Volume Session Id:      2
+  Volume Session Time:    1726582003
+  Last Volume Bytes:      252,483,814 (252.4 MB)
+  Non-fatal FD errors:    0
+  SD Errors:              0
+  FD termination status:  OK
+  SD termination status:  OK
+  Termination:            Backup OK
+
+17-сен 17:15 debian12-dir JobId 2: Begin pruning Jobs older than 12 months .
+17-сен 17:15 debian12-dir JobId 2: No Jobs found to prune.
+17-сен 17:15 debian12-dir JobId 2: Begin pruning Files.
+17-сен 17:15 debian12-dir JobId 2: No Files found to prune.
+17-сен 17:15 debian12-dir JobId 2: End auto prune.
+```
+Напомню, что параметиры резервного копирования для _Debian12cl1-fd_ и _Debian12cl2-fd_ отличаются. В первом случае, мы с помощью скрипта, запускаемого директивой _RunBeforeJob_ создаем tar-архив без сжатия с каталогами /etc и /var внутри, затем создаем
+резервную копию полученного файла, используя сжатие _GZIP_ на стороне клиента. Во втором случае, каталоги /etc и /var уже второго клиента - _Debian12cl2-fd_ непосредственно архивируются демоном _Bacula File Daemon_ с алгоритмом сжатия _LZO_.
+
+Из листинга, полученного командой messages, видно, что коэффициент сжатия _Software Compression_ для первого клиента равен **61.5% 2.6:1**, время работы по созданию резервной копии `Elapsed time: 30 secs` составило 30 сек - сопутствующие параметры `Start time: 17-сен-2024 17:14:00` и `End time: 17-сен-2024 17:14:30`.
+У второго клиента - `Elapsed time: 16 secs`, `Start time: 17-сен-2024 17:14:53`, `End time: 17-сен-2024 17:15:09`, при этом `Software Compression: 49.3% 2.0:1`. Размеры резервных копий на томе состаывили, соответственно, - `Last Volume Bytes: 195,254,627 (195.2 MB)` 
+в первом случае и `  Last Volume Bytes:      252,483,814 (252.4 MB)` - во втором.
+
+Создадим тестовый файл на виртуальной машине клиента _Debian12cl2-fd_ в каталоге `/var`:
+```
+echo 'Hello! Its Test File' > /var/testfile.txt
+```
+
+Далее проверим, что уже по расписанию создались инкрементные копии наборов файлов для обоих клиентов:
+```
+*messages 
+18-сен 09:00 debian12-dir JobId 3: Start Backup JobId 3, Job=Clnt1-fs-Job.2024-09-18_09.00.00_06
+18-сен 09:00 debian12-dir JobId 3: Created new Volume="Clnt1-fs-Incr-0003", Pool="Clnt1-fs-Incr", MediaType="File" in catalog.
+18-сен 09:00 debian12-dir JobId 3: Using Device "FileStorage" to write.
+18-сен 09:00 debian12-fd JobId 3: shell command: run ClientRunBeforeJob "/etc/bacula/scripts/bacula-before-fs.sh"
+18-сен 09:00 debian12-fd JobId 3: ClientRunBeforeJob: tar: Удаляется начальный `/' из имен объектов
+18-сен 09:00 debian12-fd JobId 3: ClientRunBeforeJob: tar: Удаляются начальные `/' из целей жестких ссылок
+18-сен 09:00 debian12-sd JobId 3: Labeled new Volume "Clnt1-fs-Incr-0003" on File device "FileStorage" (/var/lib/bacula/storage).
+18-сен 09:00 debian12-sd JobId 3: Wrote label to prelabeled Volume "Clnt1-fs-Incr-0003" on File device "FileStorage" (/var/lib/bacula/storage)
+18-сен 09:00 debian12-dir JobId 4: Start Backup JobId 4, Job=Clnt2-fs-Job.2024-09-18_09.00.00_07
+18-сен 09:00 debian12-fd JobId 3: shell command: run ClientAfterJob "/etc/bacula/scripts/bacula-after-fs.sh"
+18-сен 09:00 debian12-sd JobId 3: Elapsed time=00:00:30, Transfer rate=6.515 M Bytes/second
+18-сен 09:00 debian12-sd JobId 3: Sending spooled attrs to the Director. Despooling 224 bytes ...
+18-сен 09:00 debian12-dir JobId 3: Bacula debian12-dir 9.6.7 (10Dec20):
+  Build OS:               x86_64-pc-linux-gnu debian bookworm/sid
+  JobId:                  3
+  Job:                    Clnt1-fs-Job.2024-09-18_09.00.00_06
+  Backup Level:           Incremental, since=2024-09-17 17:14:00
+  Client:                 "Debian12cl1-fd" 9.6.7 (10Dec20) x86_64-pc-linux-gnu,debian,bookworm/sid
+  FileSet:                "My-tfs-FS" 2024-09-17 17:13:54
+  Pool:                   "Clnt1-fs-Incr" (From Job IncPool override)
+  Catalog:                "MyCatalog" (From Client resource)
+  Storage:                "debian12-sd" (From Job resource)
+  Scheduled time:         18-сен-2024 09:00:00
+  Start time:             18-сен-2024 09:00:03
+  End time:               18-сен-2024 09:00:33
+  Elapsed time:           30 secs
+  Priority:               10
+  FD Files Written:       1
+  SD Files Written:       1
+  FD Bytes Written:       195,478,009 (195.4 MB)
+  SD Bytes Written:       195,478,125 (195.4 MB)
+  Rate:                   6515.9 KB/s
+  Software Compression:   61.6% 2.6:1
+  Comm Line Compression:  None
+  Snapshot/VSS:           no
+  Encryption:             no
+  Accurate:               no
+  Volume name(s):         Clnt1-fs-Incr-0003
+  Volume Session Id:      3
+  Volume Session Time:    1726582003
+  Last Volume Bytes:      195,681,169 (195.6 MB)
+  Non-fatal FD errors:    0
+  SD Errors:              0
+  FD termination status:  OK
+  SD termination status:  OK
+  Termination:            Backup OK
+
+18-сен 09:00 debian12-dir JobId 3: Begin pruning Jobs older than 12 months .
+18-сен 09:00 debian12-dir JobId 3: No Jobs found to prune.
+18-сен 09:00 debian12-dir JobId 3: Begin pruning Files.
+18-сен 09:00 debian12-dir JobId 3: No Files found to prune.
+18-сен 09:00 debian12-dir JobId 3: End auto prune.
+
+18-сен 09:00 debian12-dir JobId 4: Created new Volume="Clnt2-fs-Incr-0004", Pool="Clnt2-fs-Incr", MediaType="File" in catalog.
+18-сен 09:00 debian12-dir JobId 4: Using Device "FileStorage" to write.
+18-сен 09:00 debian12-sd JobId 4: Labeled new Volume "Clnt2-fs-Incr-0004" on File device "FileStorage" (/var/lib/bacula/storage).
+18-сен 09:00 debian12-sd JobId 4: Wrote label to prelabeled Volume "Clnt2-fs-Incr-0004" on File device "FileStorage" (/var/lib/bacula/storage)
+18-сен 09:00 debian12-sd JobId 4: Elapsed time=00:00:01, Transfer rate=6.556 M Bytes/second
+18-сен 09:00 debian12-sd JobId 4: Sending spooled attrs to the Director. Despooling 22,406 bytes ...
+18-сен 09:00 debian12-dir JobId 4: Bacula debian12-dir 9.6.7 (10Dec20):
+  Build OS:               x86_64-pc-linux-gnu debian bookworm/sid
+  JobId:                  4
+  Job:                    Clnt2-fs-Job.2024-09-18_09.00.00_07
+  Backup Level:           Incremental, since=2024-09-17 17:14:53
+  Client:                 "Debian12cl2-fd" 9.6.7 (10Dec20) x86_64-pc-linux-gnu,debian,bookworm/sid
+  FileSet:                "My-fs-FS" 2024-09-17 17:14:21
+  Pool:                   "Clnt2-fs-Incr" (From Job IncPool override)
+  Catalog:                "MyCatalog" (From Client resource)
+  Storage:                "debian12-sd" (From Job resource)
+  Scheduled time:         18-сен-2024 09:00:00
+  Start time:             18-сен-2024 09:00:35
+  End time:               18-сен-2024 09:00:36
+  Elapsed time:           1 sec
+  Priority:               10
+  FD Files Written:       115
+  SD Files Written:       115
+  FD Bytes Written:       6,544,139 (6.544 MB)
+  SD Bytes Written:       6,556,501 (6.556 MB)
+  Rate:                   6544.1 KB/s
+  Software Compression:   68.7% 3.2:1
+  Comm Line Compression:  5.4% 1.1:1
+  Snapshot/VSS:           no
+  Encryption:             no
+  Accurate:               no
+  Volume name(s):         Clnt2-fs-Incr-0004
+  Volume Session Id:      4
+  Volume Session Time:    1726582003
+  Last Volume Bytes:      6,567,531 (6.567 MB)
+  Non-fatal FD errors:    0
+  SD Errors:              0
+  FD termination status:  OK
+  SD termination status:  OK
+  Termination:            Backup OK
+
+18-сен 09:00 debian12-dir JobId 4: Begin pruning Jobs older than 12 months .
+18-сен 09:00 debian12-dir JobId 4: No Jobs found to prune.
+18-сен 09:00 debian12-dir JobId 4: Begin pruning Files.
+18-сен 09:00 debian12-dir JobId 4: No Files found to prune.
+18-сен 09:00 debian12-dir JobId 4: End auto prune.
+```
+>[!INFORMATION]
+> Можно обратить внимание, что инкрементные копии были созданы уже на следующий день, т.к. ноутбук с работающим стендом на ночь отпрвлялся в режим сна.
+
+Проверим, что в файлах _bootstrap_ на сервере резервных копий появились соответствующие записи:
+```
+root@debian12:~# cat /var/lib/bacula/Debian12cl1-fd.bsr 
+# 17-сен-2024 17:14:30 - Clnt1-fs-Job.2024-09-17_17.13.54_03 - Full
+Volume="Clnt1-fs-Full-0001"
+MediaType="File"
+VolSessionId=1
+VolSessionTime=1726582003
+VolAddr=238-195254626
+FileIndex=1-1
+# 18-сен-2024 09:00:33 - Clnt1-fs-Job.2024-09-18_09.00.00_06 - Incremental, since=2024-09-17 17:14:00
+Volume="Clnt1-fs-Incr-0003"
+MediaType="File"
+VolSessionId=3
+VolSessionTime=1726582003
+VolAddr=238-195681168
+FileIndex=1-1
+root@debian12:~# cat /var/lib/bacula/Debian12cl2-fd.bsr 
+# 17-сен-2024 17:15:09 - Clnt2-fs-Job.2024-09-17_17.14.21_04 - Full
+Volume="Clnt2-fs-Full-0002"
+MediaType="File"
+VolSessionId=2
+VolSessionTime=1726582003
+VolAddr=238-252483813
+FileIndex=1-13887
+# 18-сен-2024 09:00:36 - Clnt2-fs-Job.2024-09-18_09.00.00_07 - Incremental, since=2024-09-17 17:14:53
+Volume="Clnt2-fs-Incr-0004"
+MediaType="File"
+VolSessionId=4
+VolSessionTime=1726582003
+VolAddr=238-6567530
+FileIndex=1-115
+```
+Также проверим наличие физических файлов томов:
+```
+root@debian12:~# ls -l /var/lib/bacula/storage/
+итого 634764
+-rw-r----- 1 bacula tape 195254627 сен 17 17:14 Clnt1-fs-Full-0001
+-rw-r----- 1 bacula tape 195681169 сен 18 09:00 Clnt1-fs-Incr-0003
+-rw-r----- 1 bacula tape 252483814 сен 17 17:15 Clnt2-fs-Full-0002
+-rw-r----- 1 bacula tape   6567531 сен 18 09:00 Clnt2-fs-Incr-0004
+```
+
+#### Восстановление информации
+Удалим ранее созданный тестовый файл с клиентской машины и затем восстановим его из копии:
+```
+max@localhost:~/vagrant/vg3> vagrant ssh Debian12cl2 
+Linux debian12 6.1.0-22-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.94-1 (2024-06-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Sep 18 08:57:17 2024 from 192.168.121.1
+vagrant@debian12:~$ sudo -i
+root@debian12:~# ls -l /var/
+итого 40
+drwxr-xr-x  2 root root  4096 сен 18 08:52 backups
+drwxr-xr-x 19 root root  4096 сен 18 08:52 cache
+drwxr-xr-x 54 root root  4096 сен 17 17:03 lib
+drwxrwsr-x  2 root staff 4096 янв 29  2024 local
+lrwxrwxrwx  1 root root     9 мая 19 23:39 lock -> /run/lock
+drwxr-xr-x 11 root root  4096 сен 18 08:52 log
+drwxrwsr-x  2 root mail  4096 мая 19 23:39 mail
+drwxr-xr-x  2 root root  4096 мая 19 23:39 opt
+lrwxrwxrwx  1 root root     4 мая 19 23:39 run -> /run
+drwxr-xr-x  6 root root  4096 мая 20 00:00 spool
+-rw-r--r--  1 root root    21 сен 18 08:57 testfile.txt
+drwxrwxrwt 11 root root  4096 сен 18 08:52 tmp
+root@debian12:~# rm /var/testfile.txt 
+root@debian12:~# ls -l /var/
+итого 36
+drwxr-xr-x  2 root root  4096 сен 18 08:52 backups
+drwxr-xr-x 19 root root  4096 сен 18 08:52 cache
+drwxr-xr-x 54 root root  4096 сен 17 17:03 lib
+drwxrwsr-x  2 root staff 4096 янв 29  2024 local
+lrwxrwxrwx  1 root root     9 мая 19 23:39 lock -> /run/lock
+drwxr-xr-x 11 root root  4096 сен 18 08:52 log
+drwxrwsr-x  2 root mail  4096 мая 19 23:39 mail
+drwxr-xr-x  2 root root  4096 мая 19 23:39 opt
+lrwxrwxrwx  1 root root     4 мая 19 23:39 run -> /run
+drwxr-xr-x  6 root root  4096 мая 20 00:00 spool
+drwxrwxrwt 11 root root  4096 сен 18 08:52 tmp
+```
+
+Теперь на сервере заходим в консоль _Bacula_ и запускаем процесс восстановления, с этим нам поможет команда `restore`:
+```
+root@debian12:~# bconsole 
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*restore 
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
+
+First you select one or more JobIds that contain files
+to be restored. You will be presented several methods
+of specifying the JobIds. Then you will be allowed to
+select which files from those JobIds are to be restored.
+
+To select the JobIds, you have the following choices:
+     1: List last 20 Jobs run
+     2: List Jobs where a given File is saved
+     3: Enter list of comma separated JobIds to select
+     4: Enter SQL list command
+     5: Select the most recent backup for a client
+     6: Select backup for a client before a specified time
+     7: Enter a list of files to restore
+     8: Enter a list of files to restore before a specified time
+     9: Find the JobIds of the most recent backup for a client
+    10: Find the JobIds for a backup for a client before a specified time
+    11: Enter a list of directories to restore for found JobIds
+    12: Select full restore to a specified Job date
+    13: Cancel
+```
+Здесь нам предложили выбрать, каким образом мы будем искать нужный файл. Выберем пункт _5_:
+```
+Select item:  (1-13): 5
+Defined Clients:
+     1: Debian12cl1-fd
+     2: Debian12cl2-fd
+     3: debian12-fd
+Select the Client (1-3): 2
+Automatically selected FileSet: My-fs-FS
++-------+-------+----------+-------------+---------------------+--------------------+
+| jobid | level | jobfiles | jobbytes    | starttime           | volumename         |
++-------+-------+----------+-------------+---------------------+--------------------+
+|     2 | F     |   13,887 | 249,852,594 | 2024-09-17 17:14:53 | Clnt2-fs-Full-0002 |
+|     4 | I     |      115 |   6,544,139 | 2024-09-18 09:00:35 | Clnt2-fs-Incr-0004 |
++-------+-------+----------+-------------+---------------------+--------------------+
+You have selected the following JobIds: 2,4
+
+Building directory tree for JobId(s) 2,4 ...  ++++++++++++++++++++++++++++++++++++++++++++++++
+13,411 files inserted into the tree.
+
+You are now entering file selection mode where you add (mark) and
+remove (unmark) files to be restored. No files are initially added, unless
+you used the "all" keyword on the command line.
+Enter "done" to leave this mode.
+
+cwd is: /
+```
+После того, как мы выбрали просмотр последней резервной копии, мы выбираем нужный _Bacula Client_ или _Bacula FD_ и попадаем в дерево каталогов, которое содержится в резервной копии.
+
+Перейдём в нужный каталог и выберем наш тестовый файл с помощью команды `mark`:
+```
+$ cd /var
+cwd is: /var/
+$ ls
+backups/
+cache/
+lib/
+local
+lock
+log/
+mail
+opt
+run
+spool/
+testfile.txt
+tmp/
+$ mark testfile.txt 
+1 file marked.
+$ done
+Bootstrap records written to /var/lib/bacula/debian12-dir.restore.1.bsr
+
+The Job will require the following (*=>InChanger):
+   Volume(s)                 Storage(s)                SD Device(s)
+===========================================================================
+   
+    Clnt2-fs-Incr-0004        debian12-sd               FileStorage              
+
+Volumes marked with "*" are in the Autochanger.
+
+
+1 file selected to be restored.
+```
+Завершается выбор командой `done`. Далее нам предлагают выбрать задачу для восстановления и проверить параметры, которые в ней заданы:
+```
+The defined Restore Job resources are:
+     1: RestoreFiles
+     2: MyRestoreFiles
+Select Restore Job (1-2): 2
+Using Catalog "MyCatalog"
+Run Restore job
+JobName:         MyRestoreFiles
+Bootstrap:       /var/lib/bacula/debian12-dir.restore.1.bsr
+Where:           /bacula-restores
+Replace:         Always
+FileSet:         Full Set
+Backup Client:   Debian12cl2-fd
+Restore Client:  Debian12cl2-fd
+Storage:         debian12-sd
+When:            2024-09-18 09:15:58
+Catalog:         MyCatalog
+Priority:        10
+Plugin Options:  *None*
+```
+Изменим параметр **Where**, чтобы восстановить файл в тоже место, где он размещался изначально, и запустим задачу:
+```
+OK to run? (yes/mod/no): m
+Parameters to modify:
+     1: Level
+     2: Storage
+     3: Job
+     4: FileSet
+     5: Restore Client
+     6: When
+     7: Priority
+     8: Bootstrap
+     9: Where
+    10: File Relocation
+    11: Replace
+    12: JobId
+    13: Plugin Options
+Select parameter to modify (1-13): 9
+Please enter the full path prefix for restore (/ for none): /
+Run Restore job
+JobName:         MyRestoreFiles
+Bootstrap:       /var/lib/bacula/debian12-dir.restore.1.bsr
+Where:           
+Replace:         Always
+FileSet:         Full Set
+Backup Client:   Debian12cl2-fd
+Restore Client:  Debian12cl2-fd
+Storage:         debian12-sd
+When:            2024-09-18 09:15:58
+Catalog:         MyCatalog
+Priority:        10
+Plugin Options:  *None*
+OK to run? (yes/mod/no): yes
+Job queued. JobId=5
+```
+Проверим её статус:
+```
+*messages 
+18-сен 09:16 debian12-dir JobId 5: Start Restore Job MyRestoreFiles.2024-09-18_09.16.38_10
+18-сен 09:16 debian12-dir JobId 5: Restoring files from JobId(s) 2,4
+18-сен 09:16 debian12-dir JobId 5: Using Device "FileStorage" to read.
+18-сен 09:16 debian12-sd JobId 5: Ready to read from volume "Clnt2-fs-Incr-0004" on File device "FileStorage" (/var/lib/bacula/storage).
+18-сен 09:16 debian12-sd JobId 5: Forward spacing Volume "Clnt2-fs-Incr-0004" to addr=238
+18-сен 09:16 debian12-sd JobId 5: Elapsed time=00:00:01, Transfer rate=149  Bytes/second
+18-сен 09:16 debian12-dir JobId 5: Bacula debian12-dir 9.6.7 (10Dec20):
+  Build OS:               x86_64-pc-linux-gnu debian bookworm/sid
+  JobId:                  5
+  Job:                    MyRestoreFiles.2024-09-18_09.16.38_10
+  Restore Client:         Debian12cl2-fd
+  Where:                  
+  Replace:                Always
+  Start time:             18-сен-2024 09:16:40
+  End time:               18-сен-2024 09:16:40
+  Elapsed time:           1 sec
+  Files Expected:         1
+  Files Restored:         1
+  Bytes Restored:         21 (21 B)
+  Rate:                   0.0 KB/s
+  FD Errors:              0
+  FD termination status:  OK
+  SD termination status:  OK
+  Termination:            Restore OK
+
+18-сен 09:16 debian12-dir JobId 5: Begin pruning Jobs older than 12 months .
+18-сен 09:16 debian12-dir JobId 5: No Jobs found to prune.
+18-сен 09:16 debian12-dir JobId 5: Begin pruning Files.
+18-сен 09:16 debian12-dir JobId 5: No Files found to prune.
+18-сен 09:16 debian12-dir JobId 5: End auto prune.
+```
+А также наличие восстановленного файла на своём месте:
+```
+max@localhost:~/vagrant/vg3> vagrant ssh Debian12cl2 
+Linux debian12 6.1.0-22-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.94-1 (2024-06-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Sep 18 09:09:52 2024 from 192.168.121.1
+vagrant@debian12:~$ ls -l /var/
+итого 40
+drwxr-xr-x  2 root root  4096 сен 18 08:52 backups
+drwxr-xr-x 19 root root  4096 сен 18 08:52 cache
+drwxr-xr-x 54 root root  4096 сен 17 17:03 lib
+drwxrwsr-x  2 root staff 4096 янв 29  2024 local
+lrwxrwxrwx  1 root root     9 мая 19 23:39 lock -> /run/lock
+drwxr-xr-x 11 root root  4096 сен 18 08:52 log
+drwxrwsr-x  2 root mail  4096 мая 19 23:39 mail
+drwxr-xr-x  2 root root  4096 мая 19 23:39 opt
+lrwxrwxrwx  1 root root     4 мая 19 23:39 run -> /run
+drwxr-xr-x  6 root root  4096 мая 20 00:00 spool
+-rw-r--r--  1 root root    21 сен 18 08:57 testfile.txt
+drwxrwxrwt 11 root root  4096 сен 18 08:52 tmp
+vagrant@debian12:~$ cat /var/testfile.txt 
+Hello! Its Test File
+```
+
+##### Восстановление информации в базе данных _Catalog_ в случае её утери или повреждения
+Данный раздел должен начинаться с цитаты, размещённой на странице документации утилиты _bscan_: **_Если вы обнаружили, что используете эту программу, вы, вероятно, сделали что-то неправильно._**.
+
+В любом случае, как правило, база данных _Cataliog_ размещается отдельно от службы _Storage Daemon_ и существует, хоть и небольшая, но вероятность того, что SQL-кластер повредился в результате выхода из строя дисков или серверов или
+вследствие действия зловредного ПО. При этом физические тома находятся в целостности и сохранности.
+
+Воспроизвведём такую ситуацию. Скопируем _bootstrap_-файлы и файлы томов - _Volumes_ на хостовую машину для последующего восстановления каталога с нуля. Для этого на сервере _Bacula_ скопируем нужные файлы в домашний каталог пользователя _Vagrant_ и смним их владельца и группу:
+```
+root@debian12:~# cp -R /var/lib/bacula/storage /home/vagrant/
+root@debian12:~# cp /var/lib/bacula/Debian12cl* /home/vagrant/
+
+root@debian12:~# chown -R vagrant:vagrant /home/vagrant/storage
+root@debian12:~# chown vagrant:vagrant /home/vagrant/Debian12cl*
+```
+Теперь перейдём на хост и скопируем файлы с виртуальной машины:
+```
+max@localhost:~/vagrant/vg3> scp vagrant@192.168.121.10:/home/vagrant/storage/Clnt* bacula/srv1/
+vagrant@192.168.121.10's password: 
+Clnt1-fs-Full-0001                                                                                         100%  186MB  81.2MB/s   00:02    
+Clnt1-fs-Incr-0003                                                                                         100%  187MB 104.9MB/s   00:01    
+Clnt2-fs-Full-0002                                                                                         100%  241MB  89.1MB/s   00:02    
+Clnt2-fs-Incr-0004                                                                                         100% 6414KB  79.5MB/s   00:00    
+max@localhost:~/vagrant/vg3> scp vagrant@192.168.121.10:/home/vagrant/Debian* bacula/srv1/
+vagrant@192.168.121.10's password: 
+Debian12cl1-fd.bsr                                                                                         100%  420   645.2KB/s   00:00    
+Debian12cl2-fd.bsr                                                                                         100%  424   682.0KB/s   00:00
+```
+Удалим все виртуальные машины с помощью команды `agrant destroy -f` и создадим их заново командой `vagrant up`. Предварительно отключим наши расписания в файле **bacula-dir-schedules.conf** установив значение параметра _Enabled_ в `no`:
+```
+Schedule {
+  Enabled = no
+  Name = "Clnt1-fs-Sdl"
+...
+Schedule {
+  Enabled = no
+  Name = "Clnt2-fs-Sdl"
+...
+
+```
+После успешного разворачивание стенда, зайдем на сервер и узнаем, какой пароль для подключения к базе данных _Catalog_ был задан при установке _Bacula Director_. Он потребуется для восстановления _Catalog_:
+```
+dbname = "bacula"; DB Address = "localhost"; dbuser = "bacula"; dbpassword = "5vjqDSZc5cCG"
+```
+Загрузим наши файлы _bootstrap_ (необязательно), а также файлы томов _Volume_ с хоста на виртуальную машину в их исходное место на сервере _Bacula_, 
+после чего изменим владельца и группу на исходные значения, для файлов _Debian12cl1-fd.bsr_ и _Debian12cl2-fd.bsr_ это `bacula:bacula`, для томов _Clnt1-fs-Full-0001_, _Clnt1-fs-Incr-0003_, _Clnt2-fs-Full-0002_ и _Clnt2-fs-Incr-0004_ - `bacula:tape`.
+
+Просканируем первый том, пока что без внесения изменений в _Catalog_:
+```
+root@debian12:~# bscan -c /etc/bacula/bacula-sd.conf -h localhost -P "5vjqDSZc5cCG" -v -V Clnt1-fs-Full-0001 /var/lib/bacula/storage
+bscan: butil.c:292-0 Using device: "/var/lib/bacula/storage" for reading.
+18-сен 11:01 bscan JobId 0: Ready to read from volume "Clnt1-fs-Full-0001" on File device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:323-0 Using Database: bacula, User: bacula
+bscan: bscan.c:468-0 Pool record for Clnt1-fs-Full found in DB.
+bscan: bscan.c:482-0 Pool type "Backup" is OK.
+bscan: bscan.c:499-0 VOL_LABEL: Media record not found for Volume: Clnt1-fs-Full-0001
+bscan: bscan.c:510-0 Media type "File" is OK.
+bscan: bscan.c:519-0 VOL_LABEL: OK for Volume: Clnt1-fs-Full-0001
+bscan: bscan.c:542-0 SOS_LABEL: Job record not found for JobId: 0
+18-сен 11:01 bscan JobId 0: End of Volume "Clnt1-fs-Full-0001" at addr=195254627 on device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:669-0 End of all Volumes. VolFiles=0 VolBlocks=0 VolBytes=195,145,465
+Records would have been added or updated in the catalog:
+      1 Media
+      1 Pool
+      1 Job
+      1 File
+```
+Видно, что _bscan_ обнаружила один файл, очевидно, это наш tar-архив, созданный скриптом _RunBeforeJob_.
+
+Просканируем второй том, тоже без внесения изменений в _Catalog_:
+```
+root@debian12:~# bscan -c /etc/bacula/bacula-sd.conf -h localhost -P "5vjqDSZc5cCG" -v -V Clnt2-fs-Full-0002 /var/lib/bacula/storage
+bscan: butil.c:292-0 Using device: "/var/lib/bacula/storage" for reading.
+18-сен 11:02 bscan JobId 0: Ready to read from volume "Clnt2-fs-Full-0002" on File device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:323-0 Using Database: bacula, User: bacula
+bscan: bscan.c:468-0 Pool record for Clnt2-fs-Full found in DB.
+bscan: bscan.c:482-0 Pool type "Backup" is OK.
+bscan: bscan.c:499-0 VOL_LABEL: Media record not found for Volume: Clnt2-fs-Full-0002
+bscan: bscan.c:510-0 Media type "File" is OK.
+bscan: bscan.c:519-0 VOL_LABEL: OK for Volume: Clnt2-fs-Full-0002
+bscan: bscan.c:542-0 SOS_LABEL: Job record not found for JobId: 0
+18-сен 11:02 bscan JobId 0: End of Volume "Clnt2-fs-Full-0002" at addr=252483814 on device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:669-0 End of all Volumes. VolFiles=0 VolBlocks=0 VolBytes=252,342,768
+Records would have been added or updated in the catalog:
+      1 Media
+      1 Pool
+      1 Job
+  13887 File
+```
+Здесь уже мы видим 13887 файлов, т.е. содержимое каталогов _/etc_ и _/var_ на клиентской машине.
+
+Попробуем восстановить зписи в базе данных, соответствующие нашему первому тому. Для этого добавим ключи _-s_ и _-m_. Информация по ключам доступна в `man bscan`.:
+```
+root@debian12:~# bscan -c /etc/bacula/bacula-sd.conf -h localhost -P "5vjqDSZc5cCG" -s -m -v -V Clnt1-fs-Full-0001 /var/lib/bacula/storage
+bscan: butil.c:292-0 Using device: "/var/lib/bacula/storage" for reading.
+18-сен 11:17 bscan JobId 0: Ready to read from volume "Clnt1-fs-Full-0001" on File device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:323-0 Using Database: bacula, User: bacula
+bscan: bscan.c:468-0 Pool record for Clnt1-fs-Full found in DB.
+bscan: bscan.c:482-0 Pool type "Backup" is OK.
+bscan: bscan.c:996-0 Created Media record for Volume: Clnt1-fs-Full-0001
+bscan: bscan.c:510-0 Media type "File" is OK.
+bscan: bscan.c:519-0 VOL_LABEL: OK for Volume: Clnt1-fs-Full-0001
+bscan: bscan.c:1067-0 Created Client record for Client: Debian12cl1-fd
+bscan: bscan.c:1149-0 Created new JobId=1 record for original JobId=1
+bscan: bscan.c:1093-0 Created FileSet record "My-tfs-FS"
+bscan: bscan.c:1214-0 Updated Job termination record for JobId=1 Level=Full TermStat=T
+bscan: bscan.c:1303-0 Created JobMedia record JobId 1, MediaId 1
+18-сен 11:17 bscan JobId 0: End of Volume "Clnt1-fs-Full-0001" at addr=195254627 on device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt1-fs-Full-0001
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt1-fs-Full-0001
+bscan: bscan.c:669-0 End of all Volumes. VolFiles=0 VolBlocks=0 VolBytes=195,145,465
+Records added or updated in the catalog:
+      1 Media
+      1 Pool
+      1 Job
+      1 File
+```
+Проверим результат:
+```
+root@debian12:~# bconsole 
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*list pools 
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+| poolid | name             | numvols | maxvols | maxvolbytes    | volretention | enabled | pooltype | labelformat       |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+|      1 | Default          |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | *                 |
+|      2 | File             |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | Vol-              |
+|      3 | Scratch          |       0 |       0 |              0 |   31,536,000 |       1 | Backup   | *                 |
+|      4 | Clnt1-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt1-fs-Monthly- |
+|      5 | Clnt1-fs-Full    |       0 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt1-fs-Full-    |
+|      6 | Clnt1-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt1-fs-Diff-    |
+|      7 | Clnt1-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt1-fs-Incr-    |
+|      8 | Clnt2-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt2-fs-Monthly- |
+|      9 | Clnt2-fs-Full    |       0 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt2-fs-Full-    |
+|     10 | Clnt2-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt2-fs-Diff-    |
+|     11 | Clnt2-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt2-fs-Incr-    |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+```
+Не паникуем, перезагружаем _Director_ и проверяем снова:
+```
+*reload
+*list pools
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+| poolid | name             | numvols | maxvols | maxvolbytes    | volretention | enabled | pooltype | labelformat       |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+|      1 | Default          |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | *                 |
+|      2 | File             |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | Vol-              |
+|      3 | Scratch          |       0 |       0 |              0 |   31,536,000 |       1 | Backup   | *                 |
+|      4 | Clnt1-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt1-fs-Monthly- |
+|      5 | Clnt1-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt1-fs-Full-    |
+|      6 | Clnt1-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt1-fs-Diff-    |
+|      7 | Clnt1-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt1-fs-Incr-    |
+|      8 | Clnt2-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt2-fs-Monthly- |
+|      9 | Clnt2-fs-Full    |       0 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt2-fs-Full-    |
+|     10 | Clnt2-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt2-fs-Diff-    |
+|     11 | Clnt2-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt2-fs-Incr-    |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+*list volume pool=Clnt1-fs-Full 
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+| mediaid | volumename         | volstatus | enabled | volbytes    | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin  |
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+|       1 | Clnt1-fs-Full-0001 | Archive   |       1 | 195,145,465 |        0 |   31,536,000 |       0 |    0 |         0 | File      |       0 |        0 | 2024-09-17 17:14:30 | 31,470,806 |
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+```
+Отлично! Информация о первом томе появилась. 
+Теперь выполним наши действия для всех остальных томов. Второй том::
+```
+root@debian12:~# bscan -c /etc/bacula/bacula-sd.conf -h localhost -P "5vjqDSZc5cCG" -s -m -v -V Clnt2-fs-Full-0002 /var/lib/bacula/storage
+bscan: butil.c:292-0 Using device: "/var/lib/bacula/storage" for reading.
+18-сен 11:21 bscan JobId 0: Ready to read from volume "Clnt2-fs-Full-0002" on File device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:323-0 Using Database: bacula, User: bacula
+bscan: bscan.c:468-0 Pool record for Clnt2-fs-Full found in DB.
+bscan: bscan.c:482-0 Pool type "Backup" is OK.
+bscan: bscan.c:996-0 Created Media record for Volume: Clnt2-fs-Full-0002
+bscan: bscan.c:510-0 Media type "File" is OK.
+bscan: bscan.c:519-0 VOL_LABEL: OK for Volume: Clnt2-fs-Full-0002
+bscan: bscan.c:1067-0 Created Client record for Client: Debian12cl2-fd
+bscan: bscan.c:1149-0 Created new JobId=2 record for original JobId=2
+bscan: bscan.c:1093-0 Created FileSet record "My-fs-FS"
+bscan: bscan.c:1214-0 Updated Job termination record for JobId=2 Level=Full TermStat=T
+bscan: bscan.c:1303-0 Created JobMedia record JobId 2, MediaId 2
+18-сен 11:23 bscan JobId 0: End of Volume "Clnt2-fs-Full-0002" at addr=252483814 on device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt2-fs-Full-0002
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt2-fs-Full-0002
+bscan: bscan.c:669-0 End of all Volumes. VolFiles=0 VolBlocks=0 VolBytes=252,342,768
+Records added or updated in the catalog:
+      1 Media
+      1 Pool
+      1 Job
+  13887 File
+
+root@debian12:~# bconsole 
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*reload
+*list pools
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+| poolid | name             | numvols | maxvols | maxvolbytes    | volretention | enabled | pooltype | labelformat       |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+|      1 | Default          |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | *                 |
+|      2 | File             |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | Vol-              |
+|      3 | Scratch          |       0 |       0 |              0 |   31,536,000 |       1 | Backup   | *                 |
+|      4 | Clnt1-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt1-fs-Monthly- |
+|      5 | Clnt1-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt1-fs-Full-    |
+|      6 | Clnt1-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt1-fs-Diff-    |
+|      7 | Clnt1-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt1-fs-Incr-    |
+|      8 | Clnt2-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt2-fs-Monthly- |
+|      9 | Clnt2-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt2-fs-Full-    |
+|     10 | Clnt2-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt2-fs-Diff-    |
+|     11 | Clnt2-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt2-fs-Incr-    |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+*list volume pool=Clnt2-fs-Full 
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+| mediaid | volumename         | volstatus | enabled | volbytes    | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin  |
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+|       2 | Clnt2-fs-Full-0002 | Archive   |       1 | 252,342,768 |        0 |   31,536,000 |       0 |    0 |         0 | File      |       0 |        0 | 2024-09-17 17:15:07 | 31,469,209 |
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+```
+Теперь тома с инкрементными копиями. Восстановим третий том - Clnt1-fs-Incr-0003:
+```
+root@debian12:~# bscan -c /etc/bacula/bacula-sd.conf -h localhost -P "5vjqDSZc5cCG" -s -m -v -V Clnt1-fs-Incr-0003 /var/lib/bacula/storage
+bscan: butil.c:292-0 Using device: "/var/lib/bacula/storage" for reading.
+18-сен 11:50 bscan JobId 0: Ready to read from volume "Clnt1-fs-Incr-0003" on File device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:323-0 Using Database: bacula, User: bacula
+bscan: bscan.c:468-0 Pool record for Clnt1-fs-Incr found in DB.
+bscan: bscan.c:482-0 Pool type "Backup" is OK.
+bscan: bscan.c:996-0 Created Media record for Volume: Clnt1-fs-Incr-0003
+bscan: bscan.c:510-0 Media type "File" is OK.
+bscan: bscan.c:519-0 VOL_LABEL: OK for Volume: Clnt1-fs-Incr-0003
+bscan: bscan.c:1067-0 Created Client record for Client: Debian12cl1-fd
+bscan: bscan.c:1149-0 Created new JobId=3 record for original JobId=3
+bscan: bscan.c:1084-0 Fileset "My-tfs-FS" already exists.
+bscan: bscan.c:1214-0 Updated Job termination record for JobId=3 Level=Incremental TermStat=T
+bscan: bscan.c:1303-0 Created JobMedia record JobId 3, MediaId 3
+18-сен 11:50 bscan JobId 0: End of Volume "Clnt1-fs-Incr-0003" at addr=195681169 on device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt1-fs-Incr-0003
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt1-fs-Incr-0003
+bscan: bscan.c:669-0 End of all Volumes. VolFiles=0 VolBlocks=0 VolBytes=195,571,743
+Records added or updated in the catalog:
+      1 Media
+      1 Pool
+      1 Job
+      1 File
+      
+----- И снова проверим результат -----
+      
+root@debian12:~# bconsole
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*reload
+*list pools
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+| poolid | name             | numvols | maxvols | maxvolbytes    | volretention | enabled | pooltype | labelformat       |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+|      1 | Default          |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | *                 |
+|      2 | File             |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | Vol-              |
+|      3 | Scratch          |       0 |       0 |              0 |   31,536,000 |       1 | Backup   | *                 |
+|      4 | Clnt1-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt1-fs-Monthly- |
+|      5 | Clnt1-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt1-fs-Full-    |
+|      6 | Clnt1-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt1-fs-Diff-    |
+|      7 | Clnt1-fs-Incr    |       1 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt1-fs-Incr-    |
+|      8 | Clnt2-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt2-fs-Monthly- |
+|      9 | Clnt2-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt2-fs-Full-    |
+|     10 | Clnt2-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt2-fs-Diff-    |
+|     11 | Clnt2-fs-Incr    |       0 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt2-fs-Incr-    |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+*list volume pool=Clnt1-fs-Incr 
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+| mediaid | volumename         | volstatus | enabled | volbytes    | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin  |
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+|       3 | Clnt1-fs-Incr-0003 | Archive   |       1 | 195,571,743 |        0 |   31,536,000 |       0 |    0 |         0 | File      |       0 |        0 | 2024-09-18 09:00:33 | 31,525,789 |
++---------+--------------------+-----------+---------+-------------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+```
+Восстановим четвёртый том - Clnt2-fs-Incr-0004:
+```
+root@debian12:~# bscan -c /etc/bacula/bacula-sd.conf -h localhost -P "5vjqDSZc5cCG" -s -m -v -V Clnt2-fs-Incr-0004 /var/lib/bacula/storage
+bscan: butil.c:292-0 Using device: "/var/lib/bacula/storage" for reading.
+18-сен 11:51 bscan JobId 0: Ready to read from volume "Clnt2-fs-Incr-0004" on File device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:323-0 Using Database: bacula, User: bacula
+bscan: bscan.c:468-0 Pool record for Clnt2-fs-Incr found in DB.
+bscan: bscan.c:482-0 Pool type "Backup" is OK.
+bscan: bscan.c:996-0 Created Media record for Volume: Clnt2-fs-Incr-0004
+bscan: bscan.c:510-0 Media type "File" is OK.
+bscan: bscan.c:519-0 VOL_LABEL: OK for Volume: Clnt2-fs-Incr-0004
+bscan: bscan.c:1067-0 Created Client record for Client: Debian12cl2-fd
+bscan: bscan.c:1149-0 Created new JobId=4 record for original JobId=4
+bscan: bscan.c:1084-0 Fileset "My-fs-FS" already exists.
+bscan: bscan.c:1214-0 Updated Job termination record for JobId=4 Level=Incremental TermStat=T
+bscan: bscan.c:1303-0 Created JobMedia record JobId 4, MediaId 4
+18-сен 11:51 bscan JobId 0: End of Volume "Clnt2-fs-Incr-0004" at addr=6567531 on device "FileStorage" (/var/lib/bacula/storage).
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt2-fs-Incr-0004
+bscan: bscan.c:1017-0 Updated Media record at end of Volume: Clnt2-fs-Incr-0004
+bscan: bscan.c:669-0 End of all Volumes. VolFiles=0 VolBlocks=0 VolBytes=6,563,633
+Records added or updated in the catalog:
+      1 Media
+      1 Pool
+      1 Job
+    115 File
+root@debian12:~# bconsole
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*reload
+*list pools
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+| poolid | name             | numvols | maxvols | maxvolbytes    | volretention | enabled | pooltype | labelformat       |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+|      1 | Default          |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | *                 |
+|      2 | File             |       0 |     100 | 53,687,091,200 |   31,536,000 |       1 | Backup   | Vol-              |
+|      3 | Scratch          |       0 |       0 |              0 |   31,536,000 |       1 | Backup   | *                 |
+|      4 | Clnt1-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt1-fs-Monthly- |
+|      5 | Clnt1-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt1-fs-Full-    |
+|      6 | Clnt1-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt1-fs-Diff-    |
+|      7 | Clnt1-fs-Incr    |       1 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt1-fs-Incr-    |
+|      8 | Clnt2-fs-Monthly |       0 |      12 |  1,073,741,824 |   31,536,000 |       1 | Backup   | Clnt2-fs-Monthly- |
+|      9 | Clnt2-fs-Full    |       1 |       4 |  1,073,741,824 |    7,948,800 |       1 | Backup   | Clnt2-fs-Full-    |
+|     10 | Clnt2-fs-Diff    |       0 |       2 |  1,073,741,824 |    2,678,400 |       1 | Backup   | Clnt2-fs-Diff-    |
+|     11 | Clnt2-fs-Incr    |       1 |       2 |  1,073,741,824 |      604,800 |       1 | Backup   | Clnt2-fs-Incr-    |
++--------+------------------+---------+---------+----------------+--------------+---------+----------+-------------------+
+*list volume pool=Clnt2-fs-Incr
++---------+--------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+| mediaid | volumename         | volstatus | enabled | volbytes  | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin  |
++---------+--------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+|       4 | Clnt2-fs-Incr-0004 | Archive   |       1 | 6,563,633 |        0 |   31,536,000 |       0 |    0 |         0 | File      |       0 |        0 | 2024-09-18 09:00:35 | 31,525,697 |
++---------+--------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+------------+
+```
+##### Восстановление информации с резервной копии после восстановления каталога
+
+Проверим, что на клиентской машине никаким чудным образом не появился ранее созданный и уничтоженный вместе с виртуальной машиной тестовый файл:
+```
+max@localhost:~/vagrant/vg3> vagrant ssh Debian12cl2
+==> vagrant: A new version of Vagrant is available: 2.4.1 (installed version: 2.2.18)!
+==> vagrant: To upgrade visit: https://www.vagrantup.com/downloads.html
+
+Linux debian12 6.1.0-22-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.94-1 (2024-06-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Thu Jul 11 09:21:01 2024 from 192.168.122.1
+vagrant@debian12:~$ ls -l /var/
+итого 36
+drwxr-xr-x  2 root root  4096 сен 18 10:42 backups
+drwxr-xr-x 18 root root  4096 июл 10 14:12 cache
+drwxr-xr-x 54 root root  4096 сен 18 10:42 lib
+drwxrwsr-x  2 root staff 4096 янв 29  2024 local
+lrwxrwxrwx  1 root root     9 мая 19 23:39 lock -> /run/lock
+drwxr-xr-x 11 root root  4096 сен 18 10:43 log
+drwxrwsr-x  2 root mail  4096 мая 19 23:39 mail
+drwxr-xr-x  2 root root  4096 мая 19 23:39 opt
+lrwxrwxrwx  1 root root     4 мая 19 23:39 run -> /run
+drwxr-xr-x  6 root root  4096 мая 20 00:00 spool
+drwxrwxrwt 10 root root  4096 сен 18 10:47 tmp
+```
+Выполняем восстановление файла, как и в предыдущей главе:
+```
+max@localhost:~/vagrant/vg3> vagrant ssh Debian12
+Linux debian12 6.1.0-22-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.94-1 (2024-06-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Sep 18 10:56:47 2024 from 192.168.121.1
+vagrant@debian12:~$ sudo -i
+root@debian12:~# bconsole 
+Connecting to Director localhost:9101
+1000 OK: 103 debian12-dir Version: 9.6.7 (10 December 2020)
+Enter a period to cancel a command.
+*restore
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
+
+First you select one or more JobIds that contain files
+to be restored. You will be presented several methods
+of specifying the JobIds. Then you will be allowed to
+select which files from those JobIds are to be restored.
+
+To select the JobIds, you have the following choices:
+     1: List last 20 Jobs run
+     2: List Jobs where a given File is saved
+     3: Enter list of comma separated JobIds to select
+     4: Enter SQL list command
+     5: Select the most recent backup for a client
+     6: Select backup for a client before a specified time
+     7: Enter a list of files to restore
+     8: Enter a list of files to restore before a specified time
+     9: Find the JobIds of the most recent backup for a client
+    10: Find the JobIds for a backup for a client before a specified time
+    11: Enter a list of directories to restore for found JobIds
+    12: Select full restore to a specified Job date
+    13: Cancel
+Select item:  (1-13): 5
+Defined Clients:
+     1: Debian12cl1-fd
+     2: Debian12cl2-fd
+     3: debian12-fd
+Select the Client (1-3): 2
+Automatically selected FileSet: My-fs-FS
++-------+-------+----------+-------------+---------------------+--------------------+
+| jobid | level | jobfiles | jobbytes    | starttime           | volumename         |
++-------+-------+----------+-------------+---------------------+--------------------+
+|     2 | F     |   13,887 | 251,802,548 | 2024-09-17 17:14:53 | Clnt2-fs-Full-0002 |
+|     4 | I     |      115 |   6,556,501 | 2024-09-18 09:00:35 | Clnt2-fs-Incr-0004 |
++-------+-------+----------+-------------+---------------------+--------------------+
+You have selected the following JobIds: 2,4
+
+Building directory tree for JobId(s) 2,4 ...  ++++++++++++++++++++++++++++++++++++++++++++++++
+13,411 files inserted into the tree.
+
+You are now entering file selection mode where you add (mark) and
+remove (unmark) files to be restored. No files are initially added, unless
+you used the "all" keyword on the command line.
+Enter "done" to leave this mode.
+
+cwd is: /
+$ cd /var
+cwd is: /var/
+$ ls
+backups/
+cache/
+lib/
+local
+lock
+log/
+mail
+opt
+run
+spool/
+testfile.txt
+tmp/
+$ mark testfile.txt 
+1 file marked.
+$ done
+Using Storage "debian12-sd" from MediaType "File".
+Bootstrap records written to /var/lib/bacula/debian12-dir.restore.1.bsr
+
+The Job will require the following (*=>InChanger):
+   Volume(s)                 Storage(s)                SD Device(s)
+===========================================================================
+   
+    Clnt2-fs-Incr-0004                                                           
+
+Volumes marked with "*" are in the Autochanger.
+
+
+1 file selected to be restored.
+
+The defined Restore Job resources are:
+     1: RestoreFiles
+     2: MyRestoreFiles
+Select Restore Job (1-2): 2
+Using Catalog "MyCatalog"
+Run Restore job
+JobName:         MyRestoreFiles
+Bootstrap:       /var/lib/bacula/debian12-dir.restore.1.bsr
+Where:           /bacula-restores
+Replace:         Always
+FileSet:         Full Set
+Backup Client:   Debian12cl2-fd
+Restore Client:  Debian12cl2-fd
+Storage:         debian12-sd
+When:            2024-09-18 11:54:51
+Catalog:         MyCatalog
+Priority:        10
+Plugin Options:  *None*
+OK to run? (yes/mod/no): m
+Parameters to modify:
+     1: Level
+     2: Storage
+     3: Job
+     4: FileSet
+     5: Restore Client
+     6: When
+     7: Priority
+     8: Bootstrap
+     9: Where
+    10: File Relocation
+    11: Replace
+    12: JobId
+    13: Plugin Options
+Select parameter to modify (1-13): 9
+Please enter the full path prefix for restore (/ for none): /
+Run Restore job
+JobName:         MyRestoreFiles
+Bootstrap:       /var/lib/bacula/debian12-dir.restore.1.bsr
+Where:           
+Replace:         Always
+FileSet:         Full Set
+Backup Client:   Debian12cl2-fd
+Restore Client:  Debian12cl2-fd
+Storage:         debian12-sd
+When:            2024-09-18 11:54:51
+Catalog:         MyCatalog
+Priority:        10
+Plugin Options:  *None*
+OK to run? (yes/mod/no): y
+Job queued. JobId=5
+*messages
+18-сен 11:55 debian12-dir JobId 5: Start Restore Job MyRestoreFiles.2024-09-18_11.55.08_07
+18-сен 11:55 debian12-dir JobId 5: Restoring files from JobId(s) 2,4
+18-сен 11:55 debian12-dir JobId 5: Using Device "FileStorage" to read.
+18-сен 11:55 debian12-sd JobId 5: Ready to read from volume "Clnt2-fs-Incr-0004" on File device "FileStorage" (/var/lib/bacula/storage).
+18-сен 11:55 debian12-sd JobId 5: Elapsed time=00:00:01, Transfer rate=149  Bytes/second
+18-сен 11:55 debian12-dir JobId 5: Bacula debian12-dir 9.6.7 (10Dec20):
+  Build OS:               x86_64-pc-linux-gnu debian bookworm/sid
+  JobId:                  5
+  Job:                    MyRestoreFiles.2024-09-18_11.55.08_07
+  Restore Client:         Debian12cl2-fd
+  Where:                  
+  Replace:                Always
+  Start time:             18-сен-2024 11:55:10
+  End time:               18-сен-2024 11:55:11
+  Elapsed time:           1 sec
+  Files Expected:         1
+  Files Restored:         1
+  Bytes Restored:         21 (21 B)
+  Rate:                   0.0 KB/s
+  FD Errors:              0
+  FD termination status:  OK
+  SD termination status:  OK
+  Termination:            Restore OK
+
+18-сен 11:55 debian12-dir JobId 5: Begin pruning Jobs older than 12 months .
+18-сен 11:55 debian12-dir JobId 5: No Jobs found to prune.
+18-сен 11:55 debian12-dir JobId 5: Begin pruning Files.
+18-сен 11:55 debian12-dir JobId 5: No Files found to prune.
+18-сен 11:55 debian12-dir JobId 5: End auto prune.
+
+*exit
+```
+Здесь я уже не стал комментировать все действия по задаче **Restore**, так как они подробно разобраны в предыдущей главе.
+
+Проверим, появился ли наш файл:
+```
+max@localhost:~/vagrant/vg3> vagrant ssh Debian12cl2
+Linux debian12 6.1.0-22-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.94-1 (2024-06-21) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Sep 18 11:52:49 2024 from 192.168.121.1
+vagrant@debian12:~$ ls -l /var
+итого 40
+drwxr-xr-x  2 root root  4096 сен 18 10:42 backups
+drwxr-xr-x 18 root root  4096 июл 10 14:12 cache
+drwxr-xr-x 54 root root  4096 сен 18 10:42 lib
+drwxrwsr-x  2 root staff 4096 янв 29  2024 local
+lrwxrwxrwx  1 root root     9 мая 19 23:39 lock -> /run/lock
+drwxr-xr-x 11 root root  4096 сен 18 10:43 log
+drwxrwsr-x  2 root mail  4096 мая 19 23:39 mail
+drwxr-xr-x  2 root root  4096 мая 19 23:39 opt
+lrwxrwxrwx  1 root root     4 мая 19 23:39 run -> /run
+drwxr-xr-x  6 root root  4096 мая 20 00:00 spool
+-rw-r--r--  1 root root    21 сен 18 08:57 testfile.txt
+drwxrwxrwt 10 root root  4096 сен 18 10:47 tmp
+vagrant@debian12:~$ cat /var/testfile.txt 
+Hello! Its Test File
+```
+Как видим, файл был успешно восстановлен и его содержимое соответствует исходному.
+
 
