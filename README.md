@@ -906,6 +906,26 @@ Device {
   - [bacula-fd.conf](files/clnt1/bacula-fd.conf)
   - [bacula-fd.conf](files/clnt2/bacula-fd.conf)
 
+Дерево каталогов тестового стенда выглядит следующим образом:
+```
+tree
+.
+├── bacula
+│   ├── clnt1
+│   │   └── bacula-fd.conf
+│   ├── clnt2
+│   │   └── bacula-fd.conf
+│   └── srv1
+│       ├── bacula-dir-clients.conf
+│       ├── bacula-dir.conf
+│       ├── bacula-dir-filesets.conf
+│       ├── bacula-dir-jobs.conf
+│       ├── bacula-dir-pools.conf
+│       ├── bacula-dir-schedules.conf
+│       ├── bacula-dir-storage.conf
+│       ├── bacula-sd.conf
+├── Vagrantfile
+```
 Параметры, задаваемые в данных конфигурационных файлах из каталога _files/srv_, добавляются в главный конфиг _Director_ - [bacula-dir.conf](Files/bacula-dir.conf), из каталогов _clnt1_ и _clnt2_ - заменяют параметры, созданные установщиком.
 
 C помощью прилагаемого [Vagrantfile](Vagrantfile) разворачиваем стенд.
@@ -2135,4 +2155,4 @@ Hello! Its Test File
 ```
 Как видим, файл был успешно восстановлен и его содержимое соответствует исходному.
 
-
+Спасибо за прочтение! :potted_plant:
