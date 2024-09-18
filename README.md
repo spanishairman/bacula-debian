@@ -197,7 +197,7 @@ _Скрипты_ (_ClientRunBeforeJob_ и _ClientRunAfterJob_), выполняю
 Скрипт для параметра _ClientRunBeforeJob_:
 ```
 #!/bin/bash
-tar -c -f /bacula-backup/backup.tar
+tar -c -f /bacula-backup/backup.tar /etc /var
 ```
 
 Скрипт для параметра _ClientRunAfterJob_:
