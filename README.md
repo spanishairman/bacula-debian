@@ -914,7 +914,7 @@ Device {
 
 ### Практическая часть. Разворачивание сервера Bacula с настройками, которые были приведены в предыдущей главе
 
-Для развёртиывния стенда будем использовать наш [Vagrantfile](files/Vagrantfile). Также будут использоваться файлы с параметрами для сервера Bacula _Debian12_ и двух клиентов - _Debian12cl1_ и _Debian12cl2_:
+Для развёртиывния стенда будем использовать наш [Vagrantfile](files/Vagrantfile). Также будут использоваться файлы с параметрами для сервера _Bacula_ - _Debian12_ и двух клиентов - _Debian12cl1_ и _Debian12cl2_:
   - [bacula-dir-clients.conf](files/srv/bacula-dir-clients.conf)
   - [bacula-dir-filesets.conf](files/srv/bacula-dir-filesets.conf)
   - [bacula-dir-jobs.conf](files/srv/bacula-dir-jobs.conf)
