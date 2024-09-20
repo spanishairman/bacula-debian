@@ -230,7 +230,6 @@ rm -rf /bacula-backup/backup.tar
 ```
 Job {
   Name = "Clnt1-fs-Job"
-  Type = Backup
   FileSet = "My-tfs-FS"
   Pool = Clnt1-fs-Full
   Full Backup Pool = Clnt1-fs-Full                  # write Full Backups into "Full" Pool         (#05)
@@ -242,16 +241,37 @@ Job {
   ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
   ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
 }
- 
+
+Job {
+  Name = "Clnt1-fs-Monthly-Job"
+  FileSet = "My-tfs-FS"
+  Pool = Clnt1-fs-Monthly
+  Full Backup Pool = Clnt1-fs-Monthly               # write Full Backups into "Full" Pool         (#05)
+  Schedule = "Clnt1-fs-Monthly-Sdl"
+  JobDefs = "My-JobDef-Tpl"
+  Client = "Debian12cl1-fd"
+  ClientRunBeforeJob = "/etc/bacula/scripts/bacula-before-fs.sh" # скрипт выполняющийся до задачи
+  ClientRunAfterJob = "/etc/bacula/scripts/bacula-after-fs.sh" # скрипт выполняющийся после задачи
+}
+
 Job {
   Name = "Clnt2-fs-Job"
-  Type = Backup
   FileSet = "My-fs-FS"
   Pool = Clnt2-fs-Full
   Full Backup Pool = Clnt2-fs-Full                  # write Full Backups into "Full" Pool         (#05)
   Differential Backup Pool = Clnt2-fs-Diff
   Incremental Backup Pool = Clnt2-fs-Incr           # write Incr Backups into "Incremental" Pool  (#11)
   Schedule = "Clnt2-fs-Sdl"
+  JobDefs = "My-JobDef-Tpl"
+  Client = "Debian12cl2-fd"
+}
+
+Job {
+  Name = "Clnt2-fs-Monthly-Job"
+  FileSet = "My-fs-FS"
+  Pool = Clnt2-fs-Monthly
+  Full Backup Pool = Clnt2-fs-Monthly               # write Full Backups into "Full" Pool         (#05)
+  Schedule = "Clnt2-fs-Monthly-Sdl"
   JobDefs = "My-JobDef-Tpl"
   Client = "Debian12cl2-fd"
 }
@@ -2174,4 +2194,318 @@ Hello! Its Test File
 ```
 Как видим, файл был успешно восстановлен и его содержимое соответствует исходному.
 
+##### Как работают ограничения _Volume Retation_, _Job Retention_
+
+Настроим наши расписания так, чтобы звдвчи _Clnt1-fs-Monthly-Job_ и _Clnt2-fs-Monthly-Job_ писали полную резервную копию на тома _Clnt1-fs-Monthly_ и _Clnt2-fs-Monthly_ каждые две минуты.
+При этом для обоих пулов установим значение _Volume Retention__ равное 10  минутам. Также, для клиента _Debian12cl1-fd_ установим параметр _Job Retention_, также равным 10 минутам.
+
+Тогда описание клиентов будет таким:
+```
+# Client (File Services) to backup
+Client {
+  Name = Debian12cl1-fd
+  Address = 192.168.121.11
+  FDPort = 9102
+  Catalog = MyCatalog
+  Password = "DYrPl1SQnGYgUHDy809bU6ejZyo-N97m4"          # password for FileDaemon
+  File Retention = 10 min
+  Job Retention = 10 min
+  AutoPrune = yes                     # Prune expired Jobs/Files
+}
+
+# Client (File Services) to backup
+Client {
+  Name = Debian12cl2-fd
+  Address = 192.168.121.12
+  FDPort = 9102
+  Catalog = MyCatalog
+  Password = "tyWfHO1Bp3joollMSdXggFoeBoMTPZF8G"          # password for FileDaemon
+  File Retention = 365 days           # 60 days
+  Job Retention = 12 months           # six months
+  AutoPrune = yes                     # Prune expired Jobs/Files
+}
+```
+
+Настройки для пулов будут выглядеть так:
+```
+Pool {
+  Name = Clnt1-fs-Monthly
+  Pool Type = Backup
+  Recycle = yes                         # Bacula can automatically recycle Volumes
+  AutoPrune = yes                       # Prune expired volumes
+  Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
+  Volume Retention = 10  min            # How long should the Full Backups be kept? (#06)
+  Maximum Volume Bytes = 3G             # Limit Volume size to something reasonable
+  Maximum Volume Jobs = 12              # One Job = One Vol
+  Maximum Volumes = 1                   # Limit number of Volumes in Pool
+  Label Format = "Clnt1-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
+}
+
+Pool {
+  Name = Clnt2-fs-Monthly
+  Pool Type = Backup
+  Recycle = yes                         # Bacula can automatically recycle Volumes
+  AutoPrune = yes                       # Prune expired volumes
+  Recycle Oldest Volume = yes           # Prune the oldest volume in the Pool, and if all files were pruned, recycle this volume and use it.
+  Volume Retention = 10  min            # How long should the Full Backups be kept? (#06)
+  Maximum Volume Bytes = 1G             # Limit Volume size to something reasonable
+  Maximum Volume Jobs = 1               # One Job = One Vol
+  Maximum Volumes = 12                  # Limit number of Volumes in Pool
+  Label Format = "Clnt2-fs-Monthly-"    # Volumes will be labeled "Full-<volume-id>"
+}
+```
+Расписания, в таком случае, примут следующий вид:
+```
+Schedule {
+  Enabled = yes
+  Name = "Clnt1-fs-Monthly-Sdl"
+  # Run = Level=Full Pool=Clnt1-fs-Monthly on 1 at 00:00
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:02
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:04
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:06
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:08
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:10
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:12
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:14
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:16
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:18
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:20
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:22
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:24
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:26
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:28
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:30
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:32
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:34
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:36
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:38
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:40
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:42
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:44
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:46
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:48
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:50
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:52
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:54
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:56
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:58
+  Run = Level=Full FullPool=Clnt1-fs-Monthly hourly at 0:00
+}
+
+Schedule {
+  Enabled = yes
+  Name = "Clnt2-fs-Monthly-Sdl"
+  # Run = Level=Full Pool=Clnt2-fs-Monthly on 1 at 00:00
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:02
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:04
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:06
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:08
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:10
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:12
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:14
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:16
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:18
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:20
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:22
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:24
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:26
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:28
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:30
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:32
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:34
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:36
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:38
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:40
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:42
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:44
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:46
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:48
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:50
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:52
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:54
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:56
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:58
+  Run = Level=Full Pool=Clnt2-fs-Monthly hourly at 0:00
+}
+```
+> [!NOTE]
+> Bacula хранит расписание в виде битовой маски. Для каждого расписания есть шесть масок и поле минут. Маски — это час (hour), день месяца (mday), месяц (month), день недели (wday), 
+> неделя месяца (wom) и неделя года (woy). Расписание инициализируется так, чтобы биты каждой из этих масок были установлены, что означает, что в начале каждого часа 
+> задание будет выполняться. Когда вы указываете в расписании конкретный  месяц, соответствующая маска будет сброшена, и будет выбран бит, соответствующий выбранному вами месяцу. 
+> Если вы указываете второй месяц, то соответствующий ему бит также будет добавлен в маску _month_. Таким образом, когда _Bacula_ проверяет маски, чтобы увидеть, 
+> установлены ли биты в соответствии с текущим временем, ваше задание будет выполняться только в течение двух установленных вами месяцев. 
+> Аналогично, если вы устанавливаете час (hour), маска _hour_ будет очищена, и указанный вами час будет установлен в битовой маске.
+> Чтобы проверить, как установлены биты нашего расписания, в консоли _Bacula_выполним команду `show schedule=Clnt1-fs-Monthly-Sdl`.
+```
+*show schedule=Clnt1-fs-Monthly-Sdl 
+Schedule: Name=Clnt1-fs-Monthly-Sdl Enabled=1
+  --> Run Level=Full
+      hour=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 
+      mday=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 
+      month=0 1 2 3 4 5 6 7 8 9 10 11 
+      wday=0 1 2 3 4 5 6 
+      wom=0 1 2 3 4 5 
+      woy=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 
+      mins=2
+  --> Run Level=Full
+      hour=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 
+      mday=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 
+      month=0 1 2 3 4 5 6 7 8 9 10 11 
+      wday=0 1 2 3 4 5 6 
+      wom=0 1 2 3 4 5 
+      woy=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 
+      mins=4
+  --> Run Level=Full
+      hour=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 
+      mday=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 
+      month=0 1 2 3 4 5 6 7 8 9 10 11 
+      wday=0 1 2 3 4 5 6 
+      wom=0 1 2 3 4 5 
+      woy=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 
+      mins=6
+  --> Run Level=Full
+      hour=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 
+      mday=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 
+      month=0 1 2 3 4 5 6 7 8 9 10 11 
+      wday=0 1 2 3 4 5 6 
+      wom=0 1 2 3 4 5 
+      woy=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 
+      mins=8
+  --> Run Level=Full
+      hour=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 
+      mday=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 
+      month=0 1 2 3 4 5 6 7 8 9 10 11 
+      wday=0 1 2 3 4 5 6 
+      wom=0 1 2 3 4 5 
+      woy=0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 
+      mins=10
+...
+...
+```
+Теперь, после всех наших манипуляций мы должны получить следующий результат:
+  - на тома в пулах _Clnt1-fs-Monthly_ и _Clnt2-fs-Monthly_ каждые две минуты будут записываться полные копии каталогов, перечисленных в ресурсах _"My-tfs-FS"_ и _"My-fs-FS"_ (содержимое каталога /etc на клиентской машине);
+  - в соответствии с ограничениями, в пуле _Clnt1-fs-Monthly_ должен создаться один том с меткой _Clnt1-fs-Monthly-_, содержащий 12 задач с наборами резервных копий, а в пуле _Clnt2-fs-Monthly_ - 12 томов с метками _Clnt2-fs-Monthly-_ и с одной задачей, содержащей наборы резервных копий, в каждои томе;
+  - в тоже время, для томов каждого пула установлено значение _Volume Retention_, равное 10 минутам, а для задач клиента __Debian12cl1-fd_ - _Job Retention_ так же равное 10 минутам. Т.е., начиная с шестой задачи, в первом пуле будет один том с просроченным параметром _Volume Retention_, а во втором - одна задача также с просроченным значением _Job Retention_. Это позволяет предположить, что оба пула, при данных настройках, никогда не дойдут до своих ограничений в количестве томов и задач в них.
+
+Запускаем стенд и ждем, когда будут созданы первые резервные копии, после этого проверяем содержимое пулов. Пул _Clnt1-fs-Monthly_ (один том, двенадцать задач на нём) - пока-что содержит две задачи, время первой записи - `firstwritten: 2024-09-20 23:36:53`:
+```
+*llist volume=Clnt1-fs-Monthly-0002
+          mediaid: 2
+       volumename: Clnt1-fs-Monthly-0002
+             slot: 0
+           poolid: 4
+        mediatype: File
+      mediatypeid: 0
+     firstwritten: 2024-09-20 23:36:53
+      lastwritten: 2024-09-20 23:38:30
+        labeldate: 2024-09-20 23:36:53
+          voljobs: 2
+         volfiles: 0
+        volblocks: 6,054
+         volparts: 0
+    volcloudparts: 0
+   cacheretention: 0
+        volmounts: 2
+         volbytes: 390,527,517
+
+```
+Пул _Clnt2-fs-Monthly_ (двенадцать томов по 1 задаче):
+```
+*list volume pool=Clnt2-fs-Monthly
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+| mediaid | volumename            | volstatus | enabled | volbytes  | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin |
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+|       1 | Clnt2-fs-Monthly-0001 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:36:40 |       511 |
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+```
+Здесь пока один том, время записи (параметр _lastwritten_) - `2024-09-20 23:36:40`.
+
+через несколько минут уже:
+```
+*list volume pool=Clnt2-fs-Monthly
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+| mediaid | volumename            | volstatus | enabled | volbytes  | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin |
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+|       1 | Clnt2-fs-Monthly-0001 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:36:40 |         0 |
+|       3 | Clnt2-fs-Monthly-0003 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:38:35 |        47 |
+|       4 | Clnt2-fs-Monthly-0004 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:40:35 |       167 |
+|       5 | Clnt2-fs-Monthly-0005 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:42:35 |       287 |
+|       6 | Clnt2-fs-Monthly-0006 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:44:35 |       407 |
+|       7 | Clnt2-fs-Monthly-0007 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:46:35 |       527 |
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+```
+Здесь мы видим, что последний том с именем _Clnt2-fs-Monthly-0007_ в пуле _Clnt2-fs-Monthly_ записан в 23:46:35, всего томов - шесть, разница во времени между первым и последним томом - 9:55. 
+
+Проверяем спустя несколько секунд:
+```
+*list volume pool=Clnt2-fs-Monthly
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+| mediaid | volumename            | volstatus | enabled | volbytes  | volfiles | volretention | recycle | slot | inchanger | mediatype | voltype | volparts | lastwritten         | expiresin |
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+|       1 | Clnt2-fs-Monthly-0001 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:48:35 |       574 |
+|       3 | Clnt2-fs-Monthly-0003 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:38:35 |         0 |
+|       4 | Clnt2-fs-Monthly-0004 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:40:35 |        94 |
+|       5 | Clnt2-fs-Monthly-0005 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:42:35 |       214 |
+|       6 | Clnt2-fs-Monthly-0006 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:44:35 |       334 |
+|       7 | Clnt2-fs-Monthly-0007 | Used      |       1 | 2,306,324 |        0 |          600 |       1 |    0 |         0 | File      |       1 |        0 | 2024-09-20 23:46:35 |       454 |
++---------+-----------------------+-----------+---------+-----------+----------+--------------+---------+------+-----------+-----------+---------+----------+---------------------+-----------+
+```
+Здесь уже наглядно видно, что последняя запись произведена в том с именем _Clnt2-fs-Monthly-0001_, т.е. первый том в данном пуле томов. Следовательно, ограничение _Volume Retention_ для пула сработало
+и резервные копии записываются циклично в самый старый том а количество томов осталось прежним, равным шести не достигнув ограничения пула в 12 томов, в соответствии с заданными параметрами:
+```
+Recycle Oldest Volume = yes
+Volume Retention = 10  min
+```
+В случае же с ограничением _Job Retention_, заданном в ресурсе Клиента, наборы резервных копий продолжают записываться в том до тех пор, пока не будет достигнуто ограничение в количестве задач для данного тома:
+```
+*llist volume=Clnt1-fs-Monthly-0002
+          mediaid: 2
+       volumename: Clnt1-fs-Monthly-0002
+             slot: 0
+           poolid: 4
+        mediatype: File
+      mediatypeid: 0
+     firstwritten: 2024-09-20 23:36:53
+      lastwritten: 2024-09-20 23:58:30
+        labeldate: 2024-09-20 23:36:53
+          voljobs: 12
+         volfiles: 0
+        volblocks: 36,324
+         volparts: 0
+    volcloudparts: 0
+   cacheretention: 0
+        volmounts: 12
+
+```
+При этом, так как для томов в пуле _Clnt2-fs-Monthly_ задан параметр _Volume Retention_ равным 10 минутам, а значения времени для этого параметра начинают отсчитываться от момента 
+последней записи, мы получаем очередь из задач, ожидающих свободные тома, пока не истечёт десять минут с момента записи задачи с номером двенадцать для этого тома, так как единственный том в пуле имеет статус `volstatus: Used`.
+Чтобы избежать таких очередей уменьшим параметр _Volume Retention_ до значения меньшего или равного частоте запуска задачи _Clnt1-fs-Monthly-Job_ из расписания _Clnt1-fs-Monthly-Sdl_:
+```
+*update volume=Clnt1-fs-Monthly-0002
+Parameters to modify:
+     1: Volume Status
+     2: Volume Retention Period
+     3: Volume Use Duration
+     4: Maximum Volume Jobs
+     5: Maximum Volume Files
+     6: Maximum Volume Bytes
+     7: Recycle Flag
+     8: Slot
+     9: InChanger Flag
+    10: Volume Files
+    11: Pool
+    12: Volume from Pool
+    13: All Volumes from Pool
+    14: All Volumes from all Pools
+    15: Enabled
+    16: RecyclePool
+    17: Action On Purge
+    18: Cache Retention
+    19: Done
+Select parameter to modify (1-19): 2
+Updating Volume "Clnt1-fs-Monthly-0002"
+Current retention period is: 10 mins 
+59
+New retention period is: 59 secs
+```
 Спасибо за прочтение! :potted_plant:
