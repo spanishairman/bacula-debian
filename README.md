@@ -2196,8 +2196,8 @@ Hello! Its Test File
 
 ##### Как работают ограничения _Volume Retation_, _Job Retention_
 
-Настроим наши расписания так, чтобы звдвчи _Clnt1-fs-Monthly-Job_ и _Clnt2-fs-Monthly-Job_ писали полную резервную копию на тома _Clnt1-fs-Monthly_ и _Clnt2-fs-Monthly_ каждые две минуты.
-При этом для обоих пулов установим значение _Volume Retention__ равное 10  минутам. Также, для клиента _Debian12cl1-fd_ установим параметр _Job Retention_, также равным 10 минутам.
+Настроим наши расписания так, чтобы задачи _Clnt1-fs-Monthly-Job_ и _Clnt2-fs-Monthly-Job_ писали полную резервную копию на тома _Clnt1-fs-Monthly_ и _Clnt2-fs-Monthly_ каждые две минуты.
+При этом для обоих пулов установим значение _Volume Retention_ равное 10  минутам. Также, для клиента _Debian12cl1-fd_ установим параметр _Job Retention_, также равным 10 минутам.
 
 Тогда описание клиентов будет таким:
 ```
@@ -2335,7 +2335,7 @@ Schedule {
 > Если вы указываете второй месяц, то соответствующий ему бит также будет добавлен в маску _month_. Таким образом, когда _Bacula_ проверяет маски, чтобы увидеть, 
 > установлены ли биты в соответствии с текущим временем, ваше задание будет выполняться только в течение двух установленных вами месяцев. 
 > Аналогично, если вы устанавливаете час (hour), маска _hour_ будет очищена, и указанный вами час будет установлен в битовой маске.
-> Чтобы проверить, как установлены биты нашего расписания, в консоли _Bacula_выполним команду `show schedule=Clnt1-fs-Monthly-Sdl`.
+> Чтобы проверить, как установлены биты нашего расписания, в консоли _Bacula_ выполним команду `show schedule=Clnt1-fs-Monthly-Sdl`.
 ```
 *show schedule=Clnt1-fs-Monthly-Sdl 
 Schedule: Name=Clnt1-fs-Monthly-Sdl Enabled=1
@@ -2384,10 +2384,10 @@ Schedule: Name=Clnt1-fs-Monthly-Sdl Enabled=1
 ```
 Теперь, после всех наших манипуляций мы должны получить следующий результат:
   - на тома в пулах _Clnt1-fs-Monthly_ и _Clnt2-fs-Monthly_ каждые две минуты будут записываться полные копии каталогов, перечисленных в ресурсах _"My-tfs-FS"_ и _"My-fs-FS"_ (содержимое каталога /etc на клиентской машине);
-  - в соответствии с ограничениями, в пуле _Clnt1-fs-Monthly_ должен создаться один том с меткой _Clnt1-fs-Monthly-_, содержащий 12 задач с наборами резервных копий, а в пуле _Clnt2-fs-Monthly_ - 12 томов с метками _Clnt2-fs-Monthly-_ и с одной задачей, содержащей наборы резервных копий, в каждои томе;
-  - в тоже время, для томов каждого пула установлено значение _Volume Retention_, равное 10 минутам, а для задач клиента __Debian12cl1-fd_ - _Job Retention_ так же равное 10 минутам. Т.е., начиная с шестой задачи, в первом пуле будет один том с просроченным параметром _Volume Retention_, а во втором - одна задача также с просроченным значением _Job Retention_. Это позволяет предположить, что оба пула, при данных настройках, никогда не дойдут до своих ограничений в количестве томов и задач в них.
+  - в соответствии с ограничениями, в пуле _Clnt1-fs-Monthly_ должен создаться один том с меткой _Clnt1-fs-Monthly-_, содержащий 12 задач с наборами резервных копий, а в пуле _Clnt2-fs-Monthly_ - 12 томов с метками _Clnt2-fs-Monthly-_ и с одной задачей, содержащей наборы резервных копий, в каждом томе;
+  - в тоже время, для томов каждого пула установлено значение _Volume Retention_, равное 10 минутам, а для задач клиента _Debian12cl1-fd_ - _Job Retention_ так же равное 10 минутам. Т.е., начиная с шестой задачи, в первом пуле будет один том с просроченным параметром _Volume Retention_, а во втором - одна задача также с просроченным значением _Job Retention_. Это позволяет предположить, что оба пула, при данных настройках, никогда не дойдут до своих ограничений в количестве томов и задач в них.
 
-Запускаем стенд и ждем, когда будут созданы первые резервные копии, после этого проверяем содержимое пулов. Пул _Clnt1-fs-Monthly_ (один том, двенадцать задач на нём) - пока-что содержит две задачи, время первой записи - `firstwritten: 2024-09-20 23:36:53`:
+Запускаем стенд и ждем, когда будут созданы первые резервные копии, после этого проверяем содержимое пулов. Пул _Clnt1-fs-Monthly_ (один том, двенадцать задач на нём) - пока что содержит две задачи, время первой записи - `firstwritten: 2024-09-20 23:36:53`:
 ```
 *llist volume=Clnt1-fs-Monthly-0002
           mediaid: 2
@@ -2507,5 +2507,113 @@ Updating Volume "Clnt1-fs-Monthly-0002"
 Current retention period is: 10 mins 
 59
 New retention period is: 59 secs
+```
+Дальнейший листинг показывает, как меняется содержимое и статус тома c _Append_ на _Used_ затем _Recycle_ и снова _Append_ при достижении им ограничивающего значения для параметра `Maximum Volume Jobs = 12`
+
+```
+*llist volume=Clnt1-fs-Monthly-0002
+          mediaid: 2
+       volumename: Clnt1-fs-Monthly-0002
+             slot: 0
+           poolid: 4
+        mediatype: File
+      mediatypeid: 0
+     firstwritten: 2024-09-21 00:29:02
+      lastwritten: 2024-09-21 00:46:29
+        labeldate: 2024-09-21 00:24:01
+          voljobs: 12
+         volfiles: 0
+        volblocks: 36,408
+         volparts: 0
+    volcloudparts: 0
+   cacheretention: 0
+        volmounts: 36
+         volbytes: 2,348,356,412
+        volabytes: 0
+      volapadding: 0
+     volholebytes: 0
+         volholes: 0
+    lastpartbytes: 0
+        volerrors: 0
+        volwrites: 109,143
+ volcapacitybytes: 0
+        volstatus: Used
+          enabled: 1
+          recycle: 1
+     volretention: 59
+   voluseduration: 0
+       maxvoljobs: 12
+      maxvolfiles: 0
+      maxvolbytes: 3,221,225,472
+      
+*llist volume=Clnt1-fs-Monthly-0002
+          mediaid: 2
+       volumename: Clnt1-fs-Monthly-0002
+             slot: 0
+           poolid: 4
+        mediatype: File
+      mediatypeid: 0
+     firstwritten: 1970-01-01 03:00:00
+      lastwritten: 2024-09-21 00:46:29
+        labeldate: 2024-09-21 00:24:01
+          voljobs: 0
+         volfiles: 0
+        volblocks: 0
+         volparts: 0
+    volcloudparts: 0
+   cacheretention: 0
+        volmounts: 36
+         volbytes: 1
+        volabytes: 0
+      volapadding: 0
+     volholebytes: 0
+         volholes: 0
+    lastpartbytes: 0
+        volerrors: 0
+        volwrites: 109,143
+ volcapacitybytes: 0
+        volstatus: Recycle
+          enabled: 1
+          recycle: 1
+     volretention: 59
+   voluseduration: 0
+       maxvoljobs: 12
+      maxvolfiles: 0
+      maxvolbytes: 3,221,225,472
+      
+*llist volume=Clnt1-fs-Monthly-0002
+          mediaid: 2
+       volumename: Clnt1-fs-Monthly-0002
+             slot: 0
+           poolid: 4
+        mediatype: File
+      mediatypeid: 0
+     firstwritten: 2024-09-21 00:48:01
+      lastwritten: 2024-09-21 00:48:29
+        labeldate: 2024-09-21 00:48:01
+          voljobs: 1
+         volfiles: 0
+        volblocks: 3,034
+         volparts: 0
+    volcloudparts: 0
+   cacheretention: 0
+        volmounts: 37
+         volbytes: 195,696,224
+        volabytes: 0
+      volapadding: 0
+     volholebytes: 0
+         volholes: 0
+    lastpartbytes: 0
+        volerrors: 0
+        volwrites: 112,178
+ volcapacitybytes: 0
+        volstatus: Append
+          enabled: 1
+          recycle: 1
+     volretention: 59
+   voluseduration: 0
+       maxvoljobs: 12
+      maxvolfiles: 0
+      maxvolbytes: 3,221,225,472
 ```
 Спасибо за прочтение! :potted_plant:
